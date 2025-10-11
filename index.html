@@ -167,13 +167,13 @@
             box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
         }
 
-        .unit-toggle {
+        .unit-toggle, .standard-toggle {
             display: flex;
             gap: 10px;
             margin-bottom: 1rem;
         }
 
-        .unit-btn {
+        .unit-btn, .standard-btn {
             flex: 1;
             padding: 10px;
             text-align: center;
@@ -183,7 +183,7 @@
             cursor: pointer;
         }
 
-        .unit-btn.active {
+        .unit-btn.active, .standard-btn.active {
             background: var(--secondary);
             color: white;
             border-color: var(--secondary);
@@ -195,12 +195,6 @@
             border-radius: 6px;
             margin-bottom: 15px;
             border-left: 4px solid var(--secondary);
-        }
-
-        .work-item-title {
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: var(--primary);
         }
 
         .bill-of-quantity-table {
@@ -231,17 +225,8 @@
             background-color: var(--light) !important;
         }
 
-        .section-header {
-            font-weight: 600;
-            background-color: #e9ecef;
-        }
-
         .text-right {
             text-align: right;
-        }
-
-        .text-center {
-            text-align: center;
         }
 
         .cost-breakdown {
@@ -305,89 +290,18 @@
             display: block;
         }
 
-        .export-options {
-            display: flex;
-            gap: 10px;
+        .crew-sizing {
             margin-top: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .standard-toggle {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 1rem;
-        }
-
-        .standard-btn {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
+            padding: 15px;
             background: var(--light);
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .standard-btn.active {
-            background: var(--success);
-            color: white;
-            border-color: var(--success);
-        }
-
-        .unit-label {
-            font-size: 0.8rem;
-            color: #666;
-            margin-top: 2px;
-        }
-
-        .help-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            border-radius: 6px;
             border-left: 4px solid var(--success);
         }
 
-        .formula-box {
-            background: #e8f4fd;
-            padding: 15px;
-            border-radius: 6px;
-            margin: 10px 0;
-            border-left: 4px solid var(--secondary);
-            font-family: 'Courier New', monospace;
-        }
-
-        .reference-box {
-            background: #fff3cd;
-            padding: 15px;
-            border-radius: 6px;
-            margin: 10px 0;
-            border-left: 4px solid var(--warning);
-        }
-
-        .step-guide {
-            background: #d1ecf1;
-            padding: 15px;
-            border-radius: 6px;
-            margin: 10px 0;
-            border-left: 4px solid var(--info);
-        }
-
-        .step-number {
-            display: inline-block;
-            width: 25px;
-            height: 25px;
-            background: var(--primary);
-            color: white;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 25px;
-            margin-right: 10px;
-            font-weight: bold;
+        .crew-sizing h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: var(--primary);
         }
 
         .tooltip {
@@ -415,20 +329,6 @@
         .tooltip:hover .tooltiptext {
             visibility: visible;
             opacity: 1;
-        }
-
-        .crew-sizing {
-            margin-top: 1rem;
-            padding: 15px;
-            background: var(--light);
-            border-radius: 6px;
-            border-left: 4px solid var(--success);
-        }
-
-        .crew-sizing h3 {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-            color: var(--primary);
         }
     </style>
 </head>
@@ -473,11 +373,11 @@
                 
                 <div class="tab-container">
                     <div class="tabs" role="tablist">
-                        <div class="tab active" data-tab="general" role="tab" aria-selected="true">General Parameters</div>
-                        <div class="tab" data-tab="distribution" role="tab" aria-selected="false">Distribution Systems</div>
-                        <div class="tab" data-tab="cables" role="tab" aria-selected="false">Cables & Wiring</div>
-                        <div class="tab" data-tab="costs" role="tab" aria-selected="false">Additional Costs</div>
-                        <div class="tab" data-tab="help" role="tab" aria-selected="false">Help & Reference</div>
+                        <div class="tab active" data-tab="general" role="tab" aria-selected="true" tabindex="0">General Parameters</div>
+                        <div class="tab" data-tab="circuits" role="tab" aria-selected="false" tabindex="0">Circuits</div>
+                        <div class="tab" data-tab="cables" role="tab" aria-selected="false" tabindex="0">Cables & Wiring</div>
+                        <div class="tab" data-tab="costs" role="tab" aria-selected="false" tabindex="0">Cost Settings</div>
+                        <div class="tab" data-tab="help" role="tab" aria-selected="false" tabindex="0">Help & Reference</div>
                     </div>
                     
                     <div class="tab-content active" id="general-tab" role="tabpanel">
@@ -497,32 +397,51 @@
                             </div>
                         </div>
                     </div>
-                    <div class="tab-content" id="distribution-tab" role="tabpanel">
-                        <!-- Placeholder for distribution systems inputs -->
-                        <div class="input-group">
-                            <label>Voltage (V)</label>
-                            <input type="number" id="voltage" value="230" step="1">
-                        </div>
+                    <div class="tab-content" id="circuits-tab" role="tabpanel">
+                        <button class="btn btn-primary" id="addCircuitBtn">Add Circuit</button>
+                        <div id="circuitList"></div>
                     </div>
                     <div class="tab-content" id="cables-tab" role="tabpanel">
-                        <!-- Placeholder for cables & wiring inputs -->
                         <div class="input-group">
-                            <label>Cable Length (m)</label>
-                            <input type="number" id="cableLength" value="100" step="1">
+                            <label>Cable Type</label>
+                            <select id="cableType">
+                                <option value="THHN">THHN Copper</option>
+                                <option value="THWN">THWN Copper</option>
+                                <option value="XLPE">XLPE Aluminum</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Conduit Type</label>
+                            <select id="conduitType">
+                                <option value="PVC">PVC</option>
+                                <option value="EMT">EMT</option>
+                                <option value="IMC">IMC</option>
+                            </select>
                         </div>
                     </div>
                     <div class="tab-content" id="costs-tab" role="tabpanel">
-                        <!-- Placeholder for additional costs inputs -->
-                        <div class="input-group">
-                            <label>Material Cost</label>
-                            <input type="number" id="materialCost" value="5000" step="0.01">
-                            <div class="unit-label">PHP</div>
+                        <div class="input-row">
+                            <div class="input-group">
+                                <label>Material Cost Multiplier</label>
+                                <input type="number" id="materialMultiplier" value="1.2" step="0.1">
+                            </div>
+                            <div class="input-group">
+                                <label>Contingency Rate (%)</label>
+                                <input type="number" id="contingencyRate" value="10" step="0.1">
+                            </div>
                         </div>
                     </div>
                     <div class="tab-content" id="help-tab" role="tabpanel">
                         <div class="help-section">
                             <h3>Help & Reference</h3>
-                            <div class="formula-box">Total Cost = (Material + Labor) × (1 + Overhead%) × (1 + Profit%)</div>
+                            <div class="formula-box">
+                                Voltage Drop (%) = (2 × I × L × R) / V × 100<br>
+                                Total Cost = (Material + Labor + Equipment) × (1 + Overhead%) × (1 + Profit%) × (1 + Contingency%)
+                            </div>
+                            <div class="reference-box">
+                                PEC: Use 125% of continuous load for ampacity.<br>
+                                IEC: Refer to IEC 60364 for cable sizing.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -530,6 +449,21 @@
             
             <div class="output-section">
                 <h2 class="section-title">Calculation Results</h2>
+                <table class="bill-of-quantity-table">
+                    <thead>
+                        <tr>
+                            <th>Circuit</th>
+                            <th>Load (kVA)</th>
+                            <th>Current (A)</th>
+                            <th>Cable Size (mm²)</th>
+                            <th>Length (m)</th>
+                            <th>Voltage Drop (%)</th>
+                            <th>Material Cost (PHP)</th>
+                            <th>Labor Cost (PHP)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="boqTable"></tbody>
+                </table>
                 <div class="cost-breakdown">
                     <div class="cost-card">
                         <h3>Total Material Cost</h3>
@@ -550,6 +484,7 @@
                 </div>
                 <div class="crew-sizing">
                     <h3>Crew Sizing Estimate</h3>
+                    <div id="laborHours">Total Labor Hours: 0</div>
                     <div id="laborDays">Total Labor Days: 0</div>
                     <div id="crewSize">Suggested Crew Size: 0</div>
                 </div>
@@ -563,28 +498,102 @@
             return isNaN(value) || value === '' ? 0 : parseFloat(value);
         }
 
-        // Tab switching logic with ARIA updates
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => {
-                    t.classList.remove('active');
-                    t.setAttribute('aria-selected', 'false');
-                });
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
+        // Circuit data storage
+        let circuits = [];
 
-                tab.classList.add('active');
-                tab.setAttribute('aria-selected', 'true');
-                document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+        // Cable data (resistance in ohms/km, cost in PHP/m)
+        const cableData = {
+            THHN: { resistance: 0.005, costPerMeter: 50, sizes: [2, 3.5, 5.5, 8, 14] },
+            THWN: { resistance: 0.006, costPerMeter: 55, sizes: [2, 3.5, 5.5, 8, 14] },
+            XLPE: { resistance: 0.008, costPerMeter: 45, sizes: [4, 6, 10, 16, 25] }
+        };
+
+        // Add circuit dynamically
+        document.getElementById('addCircuitBtn').addEventListener('click', () => {
+            const circuitId = circuits.length + 1;
+            const circuitDiv = document.createElement('div');
+            circuitDiv.className = 'work-item';
+            circuitDiv.innerHTML = `
+                <div class="work-item-title">Circuit ${circuitId}</div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>Load (kVA)</label>
+                        <input type="number" class="circuit-load" value="10" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Power Factor</label>
+                        <input type="number" class="circuit-pf" value="0.85" step="0.01" min="0.1" max="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Length (m)</label>
+                        <input type="number" class="circuit-length" value="50" step="1">
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>Voltage (V)</label>
+                        <input type="number" class="circuit-voltage" value="230" step="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Phase</label>
+                        <select class="circuit-phase">
+                            <option value="single">Single Phase</option>
+                            <option value="three">Three Phase</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <button class="btn btn-danger remove-circuit" data-id="${circuitId}">Remove</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('circuitList').appendChild(circuitDiv);
+            circuits.push({ id: circuitId });
+            calculate();
+        });
+
+        // Remove circuit
+        document.getElementById('circuitList').addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-circuit')) {
+                const id = parseInt(e.target.dataset.id);
+                circuits = circuits.filter(c => c.id !== id);
+                e.target.closest('.work-item').remove();
+                calculate();
+            }
+        });
+
+        // Tab switching with ARIA and keyboard support
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab));
+            tab.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    switchTab(tab);
+                }
             });
         });
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+                t.setAttribute('tabindex', '0');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
+            tab.setAttribute('tabindex', '-1');
+            document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+        }
 
         // Unit and standard toggle
         document.querySelectorAll('.unit-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
+                calculate();
             });
         });
 
@@ -592,6 +601,7 @@
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.standard-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
+                calculate();
             });
         });
 
@@ -600,25 +610,86 @@
             const laborRate = safeNumber(document.getElementById('laborRate').value);
             const overheadRate = safeNumber(document.getElementById('overheadRate').value) / 100;
             const profitMarginRate = safeNumber(document.getElementById('profitMarginRate').value) / 100;
-            const materialCost = safeNumber(document.getElementById('materialCost').value);
-            const cableLength = safeNumber(document.getElementById('cableLength').value);
+            const contingencyRate = safeNumber(document.getElementById('contingencyRate').value) / 100;
+            const materialMultiplier = safeNumber(document.getElementById('materialMultiplier').value);
+            const cableType = document.getElementById('cableType').value;
+            const standard = document.querySelector('.standard-btn.active').dataset.standard;
 
-            // Assume labor hours based on cable length (e.g., 0.1 hours per meter)
-            const laborHours = cableLength * 0.1;
-            const laborCost = laborHours * laborRate;
-            const subtotal = materialCost + laborCost;
+            let totalMaterialCost = 0;
+            let totalLaborCost = 0;
+            let totalLaborHours = 0;
+            const boqRows = [];
+
+            document.querySelectorAll('.work-item').forEach((item, index) => {
+                const load = safeNumber(item.querySelector('.circuit-load').value);
+                const pf = safeNumber(item.querySelector('.circuit-pf').value);
+                const length = safeNumber(item.querySelector('.circuit-length').value);
+                const voltage = safeNumber(item.querySelector('.circuit-voltage').value);
+                const phase = item.querySelector('.circuit-phase').value;
+
+                // Calculate current (I = P / (V * PF * sqrt(3) for three-phase))
+                const current = phase === 'three' ? (load * 1000) / (voltage * pf * Math.sqrt(3)) : (load * 1000) / (voltage * pf);
+
+                // Cable sizing (simplified, using PEC 125% rule for continuous loads)
+                const adjustedCurrent = standard === 'philippine' ? current * 1.25 : current;
+                const cableSizes = cableData[cableType].sizes;
+                let selectedSize = cableSizes.find(size => size * 15 >= adjustedCurrent) || cableSizes[cableSizes.length - 1];
+
+                // Voltage drop calculation (VD% = (2 * I * L * R) / V * 100)
+                const resistance = cableData[cableType].resistance * length / 1000;
+                const voltageDrop = (2 * current * resistance / voltage) * 100;
+
+                // Costs
+                const materialCost = length * cableData[cableType].costPerMeter * materialMultiplier;
+                const laborHours = length * 0.05 + 2; // 0.05 hours/meter + 2 hours for termination
+                const laborCost = laborHours * laborRate;
+
+                totalMaterialCost += materialCost;
+                totalLaborCost += laborCost;
+                totalLaborHours += laborHours;
+
+                boqRows.push({
+                    circuit: `Circuit ${index + 1}`,
+                    load: load.toFixed(2),
+                    current: current.toFixed(2),
+                    cableSize: selectedSize,
+                    length: length.toFixed(2),
+                    voltageDrop: voltageDrop.toFixed(2),
+                    materialCost: materialCost.toFixed(2),
+                    laborCost: laborCost.toFixed(2)
+                });
+            });
+
+            // Update BOQ table
+            const boqTable = document.getElementById('boqTable');
+            boqTable.innerHTML = boqRows.map(row => `
+                <tr>
+                    <td>${row.circuit}</td>
+                    <td>${row.load} kVA</td>
+                    <td>${row.current} A</td>
+                    <td>${row.cableSize} mm²</td>
+                    <td>${row.length} m</td>
+                    <td>${row.voltageDrop} %</td>
+                    <td>${row.materialCost} PHP</td>
+                    <td>${row.laborCost} PHP</td>
+                </tr>
+            `).join('');
+
+            // Total cost calculation
+            const subtotal = totalMaterialCost + totalLaborCost;
             const overheadCost = subtotal * overheadRate;
-            const totalCost = (subtotal + overheadCost) * (1 + profitMarginRate);
+            const totalCost = (subtotal + overheadCost) * (1 + profitMarginRate) * (1 + contingencyRate);
 
             // Update cost breakdown
-            document.getElementById('totalMaterial').textContent = materialCost.toFixed(2) + ' PHP';
-            document.getElementById('totalLabor').textContent = laborCost.toFixed(2) + ' PHP';
+            document.getElementById('totalMaterial').textContent = totalMaterialCost.toFixed(2) + ' PHP';
+            document.getElementById('totalLabor').textContent = totalLaborCost.toFixed(2) + ' PHP';
             document.getElementById('overheadCost').textContent = overheadCost.toFixed(2) + ' PHP';
             document.getElementById('totalCost').textContent = totalCost.toFixed(2) + ' PHP';
 
-            // Crew sizing calculation (8-hour workday)
-            const laborDays = laborHours / 8;
-            const suggestedCrew = Math.min(Math.max(Math.ceil(laborDays / 5), 2), 10); // 5 days, 2-10 workers
+            // Crew sizing (8-hour workday)
+            const laborDays = totalLaborHours / 8;
+            const suggestedCrew = Math.min(Math.max(Math.ceil(laborDays / 10), 2), 15); // 10 days, 2-15 workers
+            document.getElementById('laborHours').textContent = `Total Labor Hours: ${totalLaborHours.toFixed(1)}`;
             document.getElementById('laborDays').textContent = `Total Labor Days: ${laborDays.toFixed(1)}`;
             document.getElementById('crewSize').textContent = `Suggested Crew Size: ${suggestedCrew}`;
         }
@@ -628,25 +699,63 @@
             const wb = XLSX.utils.book_new();
             const wsData = [
                 ['Project Name', document.getElementById('projectName').value],
-                ['Metric', document.querySelector('.unit-btn.active').dataset.unit],
+                ['Unit System', document.querySelector('.unit-btn.active').dataset.unit],
                 ['Standard', document.querySelector('.standard-btn.active').dataset.standard],
                 [],
-                ['Item', 'Value', 'Unit'],
-                ['Total Material Cost', parseFloat(document.getElementById('totalMaterial').textContent), 'PHP'],
-                ['Total Labor Cost', parseFloat(document.getElementById('totalLabor').textContent), 'PHP'],
-                ['Overhead Cost', parseFloat(document.getElementById('overheadCost').textContent), 'PHP'],
-                ['Total Project Cost', parseFloat(document.getElementById('totalCost').textContent), 'PHP'],
-                ['Labor Days', parseFloat(document.getElementById('laborDays').textContent.replace('Total Labor Days: ', '')), 'Days'],
-                ['Suggested Crew Size', parseInt(document.getElementById('crewSize').textContent.replace('Suggested Crew Size: ', '')), 'Workers']
+                ['Circuit', 'Load (kVA)', 'Current (A)', 'Cable Size (mm²)', 'Length (m)', 'Voltage Drop (%)', 'Material Cost (PHP)', 'Labor Cost (PHP)']
             ];
+
+            document.querySelectorAll('.work-item').forEach((item, index) => {
+                const load = safeNumber(item.querySelector('.circuit-load').value);
+                const pf = safeNumber(item.querySelector('.circuit-pf').value);
+                const length = safeNumber(item.querySelector('.circuit-length').value);
+                const voltage = safeNumber(item.querySelector('.circuit-voltage').value);
+                const phase = item.querySelector('.circuit-phase').value;
+                const current = phase === 'three' ? (load * 1000) / (voltage * pf * Math.sqrt(3)) : (load * 1000) / (voltage * pf);
+                const standard = document.querySelector('.standard-btn.active').dataset.standard;
+                const adjustedCurrent = standard === 'philippine' ? current * 1.25 : current;
+                const cableType = document.getElementById('cableType').value;
+                const cableSizes = cableData[cableType].sizes;
+                const selectedSize = cableSizes.find(size => size * 15 >= adjustedCurrent) || cableSizes[cableSizes.length - 1];
+                const resistance = cableData[cableType].resistance * length / 1000;
+                const voltageDrop = (2 * current * resistance / voltage) * 100;
+                const materialCost = length * cableData[cableType].costPerMeter * safeNumber(document.getElementById('materialMultiplier').value);
+                const laborCost = (length * 0.05 + 2) * safeNumber(document.getElementById('laborRate').value);
+
+                wsData.push([
+                    `Circuit ${index + 1}`,
+                    load,
+                    current,
+                    selectedSize,
+                    length,
+                    voltageDrop,
+                    materialCost,
+                    laborCost
+                ]);
+            });
+
+            wsData.push([]);
+            wsData.push(['Total Material Cost', parseFloat(document.getElementById('totalMaterial').textContent), 'PHP']);
+            wsData.push(['Total Labor Cost', parseFloat(document.getElementById('totalLabor').textContent), 'PHP']);
+            wsData.push(['Overhead Cost', parseFloat(document.getElementById('overheadCost').textContent), 'PHP']);
+            wsData.push(['Total Project Cost', parseFloat(document.getElementById('totalCost').textContent), 'PHP']);
+            wsData.push(['Labor Hours', parseFloat(document.getElementById('laborHours').textContent.replace('Total Labor Hours: ', '')), 'Hours']);
+            wsData.push(['Labor Days', parseFloat(document.getElementById('laborDays').textContent.replace('Total Labor Days: ', '')), 'Days']);
+            wsData.push(['Suggested Crew Size', parseInt(document.getElementById('crewSize').textContent.replace('Suggested Crew Size: ', '')), 'Workers']);
 
             const ws = XLSX.utils.aoa_to_sheet(wsData);
 
             // Apply currency formatting
-            ws['B6'] = { v: parseFloat(document.getElementById('totalMaterial').textContent), t: 'n', z: '"PHP"#,##0.00' };
-            ws['B7'] = { v: parseFloat(document.getElementById('totalLabor').textContent), t: 'n', z: '"PHP"#,##0.00' };
-            ws['B8'] = { v: parseFloat(document.getElementById('overheadCost').textContent), t: 'n', z: '"PHP"#,##0.00' };
-            ws['B9'] = { v: parseFloat(document.getElementById('totalCost').textContent), t: 'n', z: '"PHP"#,##0.00' };
+            const currencyCells = ['B' + (wsData.length - 4), 'B' + (wsData.length - 3), 'B' + (wsData.length - 2)];
+            currencyCells.forEach(cell => {
+                ws[cell] = { v: ws[cell].v, t: 'n', z: '"PHP"#,##0.00' };
+            });
+
+            // Apply currency to circuit material/labor costs
+            for (let i = 5; i < wsData.length - 7; i++) {
+                ws[`G${i + 1}`] = { v: wsData[i][6], t: 'n', z: '"PHP"#,##0.00' };
+                ws[`H${i + 1}`] = { v: wsData[i][7], t: 'n', z: '"PHP"#,##0.00' };
+            }
 
             XLSX.utils.book_append_sheet(wb, ws, 'Project Summary');
             XLSX.write(wb, 'Power_Distribution_Calculator.xlsx');
@@ -658,25 +767,64 @@
             const doc = new jsPDF();
             doc.text('Power Distribution Systems Calculator', 10, 10);
             doc.autoTable({
-                head: [['Item', 'Value', 'Unit']],
-                body: [
-                    ['Project Name', document.getElementById('projectName').value, ''],
-                    ['Metric', document.querySelector('.unit-btn.active').dataset.unit, ''],
-                    ['Standard', document.querySelector('.standard-btn.active').dataset.standard, ''],
-                    ['Total Material Cost', document.getElementById('totalMaterial').textContent, 'PHP'],
-                    ['Total Labor Cost', document.getElementById('totalLabor').textContent, 'PHP'],
-                    ['Overhead Cost', document.getElementById('overheadCost').textContent, 'PHP'],
-                    ['Total Project Cost', document.getElementById('totalCost').textContent, 'PHP'],
-                    ['Labor Days', document.getElementById('laborDays').textContent, 'Days'],
-                    ['Suggested Crew Size', document.getElementById('crewSize').textContent, 'Workers']
-                ]
+                head: [['Circuit', 'Load (kVA)', 'Current (A)', 'Cable Size (mm²)', 'Length (m)', 'Voltage Drop (%)', 'Material Cost (PHP)', 'Labor Cost (PHP)']],
+                body: circuits.map((_, index) => {
+                    const item = document.querySelectorAll('.work-item')[index];
+                    const load = safeNumber(item.querySelector('.circuit-load').value);
+                    const pf = safeNumber(item.querySelector('.circuit-pf').value);
+                    const length = safeNumber(item.querySelector('.circuit-length').value);
+                    const voltage = safeNumber(item.querySelector('.circuit-voltage').value);
+                    const phase = item.querySelector('.circuit-phase').value;
+                    const current = phase === 'three' ? (load * 1000) / (voltage * pf * Math.sqrt(3)) : (load * 1000) / (voltage * pf);
+                    const standard = document.querySelector('.standard-btn.active').dataset.standard;
+                    const adjustedCurrent = standard === 'philippine' ? current * 1.25 : current;
+                    const cableType = document.getElementById('cableType').value;
+                    const cableSizes = cableData[cableType].sizes;
+                    const selectedSize = cableSizes.find(size => size * 15 >= adjustedCurrent) || cableSizes[cableSizes.length - 1];
+                    const resistance = cableData[cableType].resistance * length / 1000;
+                    const voltageDrop = (2 * current * resistance / voltage) * 100;
+                    const materialCost = length * cableData[cableType].costPerMeter * safeNumber(document.getElementById('materialMultiplier').value);
+                    const laborCost = (length * 0.05 + 2) * safeNumber(document.getElementById('laborRate').value);
+                    return [
+                        `Circuit ${index + 1}`,
+                        load.toFixed(2),
+                        current.toFixed(2),
+                        selectedSize,
+                        length.toFixed(2),
+                        voltageDrop.toFixed(2),
+                        materialCost.toFixed(2),
+                        laborCost.toFixed(2)
+                    ];
+                }).concat([
+                    [],
+                    ['Total Material Cost', document.getElementById('totalMaterial').textContent, '', '', '', '', '', ''],
+                    ['Total Labor Cost', document.getElementById('totalLabor').textContent, '', '', '', '', '', ''],
+                    ['Overhead Cost', document.getElementById('overheadCost').textContent, '', '', '', '', '', ''],
+                    ['Total Project Cost', document.getElementById('totalCost').textContent, '', '', '', '', '', ''],
+                    ['Labor Hours', document.getElementById('laborHours').textContent, '', '', '', '', '', ''],
+                    ['Labor Days', document.getElementById('laborDays').textContent, '', '', '', '', '', ''],
+                    ['Suggested Crew Size', document.getElementById('crewSize').textContent, '', '', '', '', '', '']
+                ])
             });
             doc.save('Power_Distribution_Calculator.pdf');
         });
 
+        // Reset project
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            circuits = [];
+            document.getElementById('circuitList').innerHTML = '';
+            document.getElementById('projectName').value = '';
+            document.getElementById('laborRate').value = '250';
+            document.getElementById('overheadRate').value = '15';
+            document.getElementById('profitMarginRate').value = '20';
+            document.getElementById('materialMultiplier').value = '1.2';
+            document.getElementById('contingencyRate').value = '10';
+            calculate();
+        });
+
         // Recalculate on input change
-        document.querySelectorAll('input').forEach(input => {
-            input.addEventListener('input', calculate);
+        document.addEventListener('input', (e) => {
+            if (e.target.closest('.input-section')) calculate();
         });
 
         // Initial calculation
