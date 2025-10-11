@@ -1467,8 +1467,10 @@ function exportToPdf() {
     ]),
     startY: finalY + 10
   });
-  doc.save(`${projectData.projectName || 'project'.pdf);
-}function exportToExcel() {
+  doc.save(`${projectData.projectName || 'project'}.pdf`);
+}
+
+function exportToExcel() {
   if (!projectData.totals) {
     alert('Please calculate an estimate first.');
     return;
@@ -1483,7 +1485,8 @@ function exportToPdf() {
     ['Currency', projectData.currency],
     [],
     ['Circuit No.', 'Load (kVA)', 'Power Factor', 'Voltage (V)', 'Phase', 'Length (m)', 'Current (A)', 'Cable Size (mm²)', 'Voltage Drop (%)']
-  ];  projectData.circuits.forEach(row => {
+  ];
+  projectData.circuits.forEach(row => {
     wsData.push([
       row.circuit,
       parseFloat(row.load),
@@ -1495,8 +1498,10 @@ function exportToPdf() {
       parseFloat(row.cableSize),
       parseFloat(row.voltageDrop)
     ]);
-  });  wsData.push([]);
-  wsData.push(['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']);  projectData.workItems
+  });
+  wsData.push([]);
+  wsData.push(['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']);
+  projectData.workItems
     .filter(item => item.quantity > 0)
     .forEach((item, index) => {
       wsData.push([
@@ -1509,26 +1514,10 @@ function exportToPdf() {
         item.laborCost,
         item.totalCost
       ]);
-    });  wsData.push([
-    '',
-    'Equipment Rental/Mobilization',
-    1,
-    'lot',
-    projectData.totals.equipmentCost,
-    0,
-    0,
-    projectData.totals.equipmentCost
-  ]);
-  wsData.push([
-    '',
-    'Tools & Consumables',
-    1,
-    'lot',
-    projectData.totals.toolsCost,
-    0,
-    0,
-    projectData.totals.toolsCost
-  ]);  wsData.push([]);
+    });
+  wsData.push(['', 'Equipment Rental/Mobilization', 1, 'lot', projectData.totals.equipmentCost, 0, 0, projectData.totals.equipmentCost]);
+  wsData.push(['', 'Tools & Consumables', 1, 'lot', projectData.totals.toolsCost, 0, 0, projectData.totals.toolsCost]);
+  wsData.push([]);
   wsData.push(['Category', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']);
   wsData.push(['Materials', projectData.totals.totalMaterialCost, 0, 0, projectData.totals.totalMaterialCost]);
   wsData.push(['Labor', 0, projectData.totals.totalLaborHours, projectData.totals.totalLaborCost, projectData.totals.totalLaborCost]);
@@ -1542,27 +1531,14 @@ function exportToPdf() {
   wsData.push([]);
   wsData.push(['Labor Hours', projectData.totals.totalLaborHours, '', '', 'Hours']);
   wsData.push(['Labor Days', projectData.totals.laborDays, '', '', 'Days']);
-  wsData.push(['Suggested Crew Size', projectData.totals.suggestedCrew, '', '', 'Workers']);  const ws = XLSX.utils.aoa_to_sheet(wsData);  // Apply currency formatting
-  const currencyCells = [
-    'E10', 'G10', 'H10', // BOQ table
-    'B14', 'D14', 'E14', // Summary table
-    'B15', 'D15', 'E15',
-    'B16', 'E16',
-    'B17', 'E17',
-    'B18', 'E18',
-    'B19', 'E19',
-    'B20', 'E20',
-    'B21', 'E21'
-  ];
-  currencyCells.forEach(cell => {
-    if (ws[cell]) ws[cell].z = projectData.currency === 'PHP' ? '"₱"#,##0.00' : projectData.currency === 'USD' ? '"$"#,##0.00' : projectData.currency === 'EUR' ? '"€"#,##0.00' : '"¥"#,##0';
-  });  // Apply number formatting for quantities and hours
-  const numberCells = ['C10', 'F10', 'B12', 'C12', 'B13', 'C13'];
-  numberCells.forEach(cell => {
-    if (ws[cell]) ws[cell].z = '#,##0.0';
-  });  XLSX.utils.book_append_sheet(wb, ws, 'Project Estimate');
-  XLSX.write(wb, ${projectData.projectName || 'project'}.xlsx);
-}function saveResultsAsJson() {
+  wsData.push(['Suggested Crew Size', projectData.totals.suggestedCrew, '', '', 'Workers']);
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, 'Project Estimate');
+  XLSX.writeFile(wb, `${projectData.projectName || 'project'}.xlsx`);
+}
+
+function saveResultsAsJson() {
   if (!projectData.totals) {
     alert('Please calculate an estimate first.');
     return;
@@ -1572,12 +1548,10 @@ function exportToPdf() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = ${projectData.projectName || 'project'}_results.json;
+  a.download = `${projectData.projectName || 'project'}_results.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
-</script></body>
+</script>
+</body>
 </html>
-
-
-              
