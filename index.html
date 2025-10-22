@@ -1742,203 +1742,364 @@
     }
 
     try {
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
-        // ---- 1) Real page margins (reserve space for header/footer on all pages)
-        const PAGE = doc.internal.pageSize;
-        const MARGIN = { left: 40, right: 40, top: 96, bottom: 52 }; // <- top/bottom big enough for header/footer
+        // Page dimensions and margins
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = { left: 40, right: 40, top: 80, bottom: 60 };
 
-        // ---- 2) Header/Footer drawn inside margins
-        function drawHeaderFooter(data) {
-            // Header: baseline at margin top
-            const xL = MARGIN.left, xR = PAGE.getWidth() - MARGIN.right;
-            let y = MARGIN.top - 60; // draw header above table area (60px header height)
-
-            doc.setFontSize(12);
-            doc.text('POWER DISTRIBUTION SYSTEMS ESTIMATE', xL, y);
-
-            doc.setFontSize(9);
-            const rightLines = [
-                `Project: ${projectData.projectName || ''}`,
-                `Client: ${projectData.clientName || ''}`,
-                `Location: ${projectData.projectLocation || ''}`,
-                `Prepared By: ${projectData.preparedBy || ''}`,
-                `Date: ${projectData.projectDate || ''}`,
-                `Standard: ${(projectData.standard === 'philippine' ? 'PEC' : 'IEC') || ''}`,
-            ];
-            rightLines.forEach((t, i) => doc.text(t, xR, y + i * 12, { align: 'right' }));
-
-            // Footer
-            const str = `Page ${data.pageNumber} of ${doc.getNumberOfPages()}`;
-            doc.text(str, xR, PAGE.getHeight() - 20, { align: 'right' });
+        // Header function
+        function drawHeader() {
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text('POWER DISTRIBUTION SYSTEMS ESTIMATE', pageWidth / 2, 40, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            
+            // Left side project info
+            doc.text(`Project: ${projectData.projectName || 'Unnamed Project'}`, margin.left, 60);
+            doc.text(`Client: ${projectData.clientName || 'Not specified'}`, margin.left, 75);
+            
+            // Right side project info
+            doc.text(`Prepared By: ${projectData.preparedBy || 'Not specified'}`, pageWidth - margin.right, 60, { align: 'right' });
+            doc.text(`Date: ${projectData.projectDate || 'Not specified'}`, pageWidth - margin.right, 75, { align: 'right' });
+            
+            // Draw a line under header
+            doc.setLineWidth(0.5);
+            doc.line(margin.left, 85, pageWidth - margin.right, 85);
         }
 
-        // ---- 3) Global AutoTable defaults (no more per-table guessing)
-        doc.autoTableSetDefaults({
-            theme: 'grid',
+        // Footer function
+        function drawFooter(pageNumber, totalPages) {
+            const footerY = pageHeight - 30;
+            
+            // Draw a line above footer
+            doc.setLineWidth(0.5);
+            doc.line(margin.left, footerY - 10, pageWidth - margin.right, footerY - 10);
+            
+            doc.setFontSize(9);
+            doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
+            doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin.left, footerY);
+            doc.text(`Standard: ${currentStandard === 'philippine' ? 'PEC' : 'IEC'}`, pageWidth - margin.right, footerY, { align: 'right' });
+        }
+
+        // Get currency symbol based on selection
+        function getCurrencySymbol() {
+            const currency = document.getElementById('currency').value;
+            switch (currency) {
+                case 'PHP': return '₱';
+                case 'USD': return '$';
+                case 'EUR': return '€';
+                case 'JPY': return '¥';
+                default: return currency + ' ';
+            }
+        }
+
+        const currencySymbol = getCurrencySymbol();
+        
+        // Format currency for PDF
+        function formatCurrencyForPDF(amount) {
+            if (typeof amount !== 'number' || isNaN(amount)) return `${currencySymbol} 0.00`;
+            
+            const formatted = Math.abs(amount).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            
+            return `${currencySymbol} ${formformed}`;
+        }
+
+        // Format number
+        function formatNumberForPDF(num, decimals = 2) {
+            if (typeof num !== 'number' || isNaN(num)) return "0";
+            return num.toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        let currentY = margin.top;
+
+        // Draw header on first page
+        drawHeader();
+        currentY = 100; // Start below header
+
+        // Table 1: Direct Costs
+        const directHead = [['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']];
+        const directBody = [];
+        
+        let itemNo = 1;
+        projectData.workItems.forEach(item => {
+            if (item.quantity > 0) {
+                directBody.push([
+                    itemNo.toString(),
+                    item.name,
+                    formatNumberForPDF(item.quantity, item.unit === 'pcs' ? 0 : 2),
+                    item.unit,
+                    formatCurrencyForPDF(item.materialCost),
+                    formatNumberForPDF(item.laborHours, 1),
+                    formatCurrencyForPDF(item.laborCost),
+                    formatCurrencyForPDF(item.totalCost)
+                ]);
+                itemNo++;
+            }
+        });
+
+        // Add total row
+        directBody.push([
+            '',
+            'TOTAL DIRECT COSTS',
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.totalMaterialCost),
+            formatNumberForPDF(projectData.totals.totalLaborHours, 1),
+            formatCurrencyForPDF(projectData.totals.totalLaborCost),
+            formatCurrencyForPDF(projectData.totals.totalDirectCost)
+        ]);
+
+        doc.autoTable({
+            head: directHead,
+            body: directBody,
+            startY: currentY,
+            margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'helvetica',
-                fontSize: 9,                      // smaller text avoids wrapping
-                cellPadding: 6,
-                overflow: 'linebreak',            // wrap text instead of overlapping borders
-                lineWidth: 0.5,
-                lineColor: 150,
-                minCellHeight: 16,                // at least this tall
+                fontSize: 8,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                lineWidth: 0.25,
+                lineColor: 100
             },
             headStyles: {
                 fillColor: [44, 62, 80],
                 textColor: 255,
-                halign: 'center',
-                valign: 'middle',
-                fontSize: 9,
-                minCellHeight: 20,
+                fontStyle: 'bold',
+                halign: 'center'
             },
             bodyStyles: {
-                valign: 'middle',
+                halign: 'left'
             },
-            columnStyles: {},                   // we'll set per-table widths below
-            margin: MARGIN,
-            didDrawPage: drawHeaderFooter,
-            // IMPORTANT: improve row height calculation for multi-line cells
-            willDrawCell: (data) => {
-                // Bold "TOTAL" rows if you flag them
-                const row = data.row?.raw;
-                if (row && row._isTotal) data.cell.styles.fontStyle = 'bold';
-            },
-        });
-
-        // Helper functions
-        const fmt2 = (n) => Number(n||0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
-        const peso = (n) => `₱ ${fmt2(n)}`;
-
-        // ---- 4) TABLE 1: Direct Costs (set widths + alignment so numbers don't wrap)
-        const directHead = ['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost'];
-        
-        // Build direct costs body
-        const items = projectData.workItems.filter(i => (i.quantity ?? 0) > 0);
-        const directBody = items.map((it, idx) => ({
-            0: String(idx+1),
-            1: it.name || '',
-            2: (it.quantity ?? 0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}),
-            3: it.unit || '',
-            4: peso(it.materialCost),
-            5: (it.laborHours ?? 0).toLocaleString('en-PH', {minimumFractionDigits:1, maximumFractionDigits:1}),
-            6: peso(it.laborCost),
-            7: peso(it.totalCost),
-        }));
-
-        // Add total row
-        const t = projectData.totals;
-        directBody.push({
-            0: '', 
-            1: 'TOTAL DIRECT COSTS', 
-            2: '', 
-            3: '', 
-            4: peso(t.totalMaterialCost || 0), 
-            5: (t.totalLaborHours || 0).toLocaleString('en-PH', {minimumFractionDigits:1, maximumFractionDigits:1}), 
-            6: peso(t.totalLaborCost || 0), 
-            7: peso(t.totalDirectCost || 0), 
-            _isTotal: true
-        });
-
-        doc.autoTable({
-            head: [directHead],
-            body: directBody.map(r => [r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]]),
-            // The key to non-overlap is margins above; startY can be omitted usually.
-            // If you *must* force a start position, keep it >= margin.top:
-            startY: MARGIN.top,
-            // Lock column widths and alignment to prevent wrap/overlap
             columnStyles: {
-                0: { cellWidth: 56,  halign: 'center' }, // Item
-                1: { cellWidth: 260 },                   // Scope (wide, wraps safely)
-                2: { cellWidth: 86,  halign: 'center' }, // Qty
-                3: { cellWidth: 68,  halign: 'center' }, // Unit
-                4: { cellWidth: 120, halign: 'right'  }, // Material
-                5: { cellWidth: 96,  halign: 'right'  }, // Labor Hrs
-                6: { cellWidth: 120, halign: 'right'  }, // Labor Cost
-                7: { cellWidth: 120, halign: 'right'  }, // Total
+                0: { halign: 'center', cellWidth: 50 },  // Item No
+                1: { cellWidth: 180 },                   // Scope
+                2: { halign: 'center', cellWidth: 50 },  // Quantity
+                3: { halign: 'center', cellWidth: 40 },  // Unit
+                4: { halign: 'right', cellWidth: 70 },   // Material Cost
+                5: { halign: 'right', cellWidth: 50 },   // Labor Hours
+                6: { halign: 'right', cellWidth: 70 },   // Labor Cost
+                7: { halign: 'right', cellWidth: 70 }    // Total Cost
             },
-            // Make line spacing roomier to avoid cramped glyph overlap
-            styles: { lineHeightFactor: 1.25 },
-            // Safer page breaking
-            rowPageBreak: 'auto',   // break rows if too tall
-            pageBreak: 'auto',
+            didDrawPage: function(data) {
+                // Draw header on every page
+                drawHeader();
+                
+                // Draw footer on every page
+                const pageNumber = doc.internal.getNumberOfPages();
+                drawFooter(data.pageNumber, pageNumber);
+            }
         });
 
-        // ---- 5) TABLE 2: Indirects & Markups (place it after the first table)
-        const y2 = doc.lastAutoTable.finalY + 14;
-        const pd = projectData;
-        const rows2 = [];
-        let n = 1;
+        // Table 2: Indirect Costs
+        currentY = doc.lastAutoTable.finalY + 20;
         
-        if ((pd.parameters?.permitsCost ?? 0) > 0) {
-            rows2.push([String(n++), 'Permits & Fees', '1', 'lot', peso(pd.parameters.permitsCost)]);
-        }
-        
-        rows2.push(
-            [String(n++), `Overhead (${pd.parameters?.overheadRate ?? 0}%)`, '1', 'lot', peso(pd.totals?.overheadCost || 0)],
-            [String(n++), `Contingency (${pd.parameters?.contingencyRate ?? 0}%)`, '1', 'lot', peso(pd.totals?.contingencyCost || 0)],
-            [String(n++), `Profit Margin (${pd.parameters?.profitMarginRate ?? 0}%)`, '1', 'lot', peso(pd.totals?.profit || 0)],
-            [String(n++), `Tax (VAT) (${pd.parameters?.taxRate ?? 0}%)`, '1', 'lot', peso(pd.totals?.tax || 0)],
-        );
-        
-        const totalIndirect = (pd.totals?.totalIndirectCost || 0) + (pd.totals?.profit || 0) + (pd.totals?.tax || 0);
-        rows2.push(['', 'TOTAL INDIRECT COSTS & MARKUP', '', '', peso(totalIndirect)]);
-
-        doc.autoTable({
-            head: [['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Amount']],
-            body: rows2,
-            startY: Math.max(y2, MARGIN.top), // never above header margin
-            columnStyles: {
-                0: { cellWidth: 56,  halign: 'center' },
-                1: { cellWidth: 420 },                  // generous width for long labels
-                2: { cellWidth: 86,  halign: 'center' },
-                3: { cellWidth: 68,  halign: 'center' },
-                4: { cellWidth: 150, halign: 'right'  },
-            },
-            styles: { lineHeightFactor: 1.25 },
-        });
-
-        // ---- 6) TABLE 3: Summary (new page only if needed; margins keep it clean)
-        let y3 = doc.lastAutoTable.finalY + 14;
-        if (y3 > PAGE.getHeight() - MARGIN.bottom - 150) { 
-            doc.addPage(); 
-            y3 = MARGIN.top; 
+        // Check if we need a new page
+        if (currentY > pageHeight - 150) {
+            doc.addPage();
+            currentY = margin.top;
         }
 
+        const indirectBody = [];
+        itemNo = 1;
+
+        // Permits
+        if (projectData.parameters.permitsCost > 0) {
+            indirectBody.push([
+                itemNo.toString(),
+                'Permits & Fees',
+                '1',
+                'lot',
+                formatCurrencyForPDF(projectData.parameters.permitsCost),
+                '',
+                '',
+                formatCurrencyForPDF(projectData.parameters.permitsCost)
+            ]);
+            itemNo++;
+        }
+
+        // Overhead
+        indirectBody.push([
+            itemNo.toString(),
+            `Overhead (${projectData.parameters.overheadRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.overheadCost),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.overheadCost)
+        ]);
+        itemNo++;
+
+        // Contingency
+        indirectBody.push([
+            itemNo.toString(),
+            `Contingency (${projectData.parameters.contingencyRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.contingencyCost),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.contingencyCost)
+        ]);
+        itemNo++;
+
+        // Profit
+        indirectBody.push([
+            itemNo.toString(),
+            `Profit Margin (${projectData.parameters.profitMarginRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.profit),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.profit)
+        ]);
+        itemNo++;
+
+        // Tax
+        indirectBody.push([
+            itemNo.toString(),
+            `Tax (VAT) (${projectData.parameters.taxRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.tax),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.tax)
+        ]);
+
+        // Total indirect
+        const totalIndirect = projectData.totals.totalIndirectCost + projectData.totals.profit + projectData.totals.tax;
+        indirectBody.push([
+            '',
+            'TOTAL INDIRECT COSTS & MARKUP',
+            '',
+            '',
+            formatCurrencyForPDF(totalIndirect),
+            '',
+            '',
+            formatCurrencyForPDF(totalIndirect)
+        ]);
+
+        doc.autoTable({
+            head: directHead, // Reuse same header
+            body: indirectBody,
+            startY: currentY,
+            margin: { left: margin.left, right: margin.right },
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                lineWidth: 0.25,
+                lineColor: 100
+            },
+            headStyles: {
+                fillColor: [44, 62, 80],
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 50 },
+                1: { cellWidth: 180 },
+                2: { halign: 'center', cellWidth: 50 },
+                3: { halign: 'center', cellWidth: 40 },
+                4: { halign: 'right', cellWidth: 70 },
+                5: { halign: 'right', cellWidth: 50 },
+                6: { halign: 'right', cellWidth: 70 },
+                7: { halign: 'right', cellWidth: 70 }
+            },
+            didDrawPage: function(data) {
+                drawHeader();
+                const pageNumber = doc.internal.getNumberOfPages();
+                drawFooter(data.pageNumber, pageNumber);
+            }
+        });
+
+        // Table 3: Summary
+        currentY = doc.lastAutoTable.finalY + 20;
+        
+        // Check if we need a new page
+        if (currentY > pageHeight - 100) {
+            doc.addPage();
+            currentY = margin.top;
+        }
+
+        const summaryHead = [['Category', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']];
         const summaryBody = [
-            ['TOTAL DIRECT COSTS',
-                peso(t.totalMaterialCost || 0),
-                (t.totalLaborHours || 0).toLocaleString('en-PH', {minimumFractionDigits:1, maximumFractionDigits:1}),
-                peso(t.totalLaborCost || 0),
-                peso(t.totalDirectCost || 0)
+            [
+                'TOTAL DIRECT COSTS',
+                formatCurrencyForPDF(projectData.totals.totalMaterialCost),
+                formatNumberForPDF(projectData.totals.totalLaborHours, 1),
+                formatCurrencyForPDF(projectData.totals.totalLaborCost),
+                formatCurrencyForPDF(projectData.totals.totalDirectCost)
             ],
-            ['TOTAL INDIRECT COSTS & MARKUP', '', '', '', peso(totalIndirect)],
-            ['GRAND TOTAL', 
-                '', 
-                '', 
-                '', 
-                peso(pd.totals?.finalPrice || 0)
+            [
+                'TOTAL INDIRECT COSTS & MARKUP',
+                formatCurrencyForPDF(totalIndirect),
+                '',
+                '',
+                formatCurrencyForPDF(totalIndirect)
             ],
-        ].map(r => { r._isTotal = true; return r; });
+            [
+                'GRAND TOTAL',
+                formatCurrencyForPDF(projectData.totals.totalMaterialCost + totalIndirect),
+                formatNumberForPDF(projectData.totals.totalLaborHours, 1),
+                formatCurrencyForPDF(projectData.totals.totalLaborCost),
+                formatCurrencyForPDF(projectData.totals.finalPrice)
+            ]
+        ];
 
         doc.autoTable({
-            head: [['Category', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']],
+            head: summaryHead,
             body: summaryBody,
-            startY: y3,
-            columnStyles: {
-                0: { cellWidth: 260 },
-                1: { cellWidth: 140, halign: 'right' },
-                2: { cellWidth: 120, halign: 'right' },
-                3: { cellWidth: 140, halign: 'right' },
-                4: { cellWidth: 150, halign: 'right' },
+            startY: currentY,
+            margin: { left: margin.left, right: margin.right },
+            styles: {
+                fontSize: 9,
+                cellPadding: 4,
+                lineWidth: 0.25,
+                lineColor: 100
             },
-            styles: { lineHeightFactor: 1.25 },
+            headStyles: {
+                fillColor: [44, 62, 80],
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { cellWidth: 200, fontStyle: 'bold' },
+                1: { halign: 'right', cellWidth: 90 },
+                2: { halign: 'right', cellWidth: 70 },
+                3: { halign: 'right', cellWidth: 90 },
+                4: { halign: 'right', cellWidth: 90, fontStyle: 'bold' }
+            },
+            didDrawPage: function(data) {
+                drawHeader();
+                const pageNumber = doc.internal.getNumberOfPages();
+                drawFooter(data.pageNumber, pageNumber);
+            }
         });
 
-        // ---- 7) Save
-        const name = (pd.projectName || 'estimate').replace(/[\\/:*?"<>|]+/g, '_');
-        doc.save(`${name}_power_distribution_estimate.pdf`);
+        // Save the PDF
+        const fileName = (projectData.projectName || 'estimate').replace(/[^a-z0-9]/gi, '_') + '_power_distribution_estimate.pdf';
+        doc.save(fileName);
 
     } catch (err) {
         console.error('PDF Generation Error:', err);
