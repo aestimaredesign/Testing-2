@@ -1752,375 +1752,361 @@
         }
 
         function exportToPdf() {
-            const { jsPDF } = window.jspdf;
+    const { jsPDF } = window.jspdf;
+    
+    if (!projectData.totals) {
+        alert('No results to export. Please calculate an estimate first.');
+        return;
+    }
+
+    try {
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+        // Page dimensions and margins
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = { left: 40, right: 40, top: 80, bottom: 60 };
+        
+        // Track current Y position manually
+        let currentY = margin.top;
+
+        // Header function - called manually
+        function drawPageHeader() {
+            const headerY = 30;
+
+            // Title
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text('POWER DISTRIBUTION SYSTEMS ESTIMATE', pageWidth / 2, headerY, { align: 'center' });
             
-            if (!projectData.totals) {
-                alert('No results to export. Please calculate an estimate first.');
-                return;
-            }
-
-            try {
-                const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-
-                // Page dimensions and margins
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const pageHeight = doc.internal.pageSize.getHeight();
-                const margin = { left: 40, right: 40, top: 80, bottom: 60 };
-                const topMarginForTables = 100;
-
-                // Header function
-                function drawPageHeader(doc) {
-                    const leftMargin = 40;
-                    const headerY = 30;
-
-                    // Title
-                    doc.setFontSize(16);
-                    doc.setFont(undefined, 'bold');
-                    doc.text('POWER DISTRIBUTION SYSTEMS ESTIMATE', pageWidth / 2, headerY, { align: 'center' });
-                    
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    
-                    // Project info
-                    const projectName = document.getElementById('projectName').value || 'Unnamed Project';
-                    const clientName = document.getElementById('clientName').value || 'Not specified';
-                    const preparedBy = document.getElementById('preparedBy').value || 'Not specified';
-                    const dateStr = document.getElementById('projectDate').value || '';
-                    
-                    doc.text(`Project: ${projectName}`, leftMargin, headerY + 20);
-                    doc.text(`Client: ${clientName}`, leftMargin, headerY + 35);
-                    doc.text(`Prepared By: ${preparedBy}`, pageWidth - margin.right, headerY + 20, { align: 'right' });
-                    doc.text(`Date: ${dateStr}`, pageWidth - margin.right, headerY + 35, { align: 'right' });
-                    
-                    // Draw a line under header
-                    doc.setLineWidth(0.5);
-                    doc.line(margin.left, headerY + 45, pageWidth - margin.right, headerY + 45);
-                }
-
-                // Footer function
-                function drawPageFooter(doc, pageNumber, totalPages) {
-                    const footerY = pageHeight - 30;
-                    
-                    doc.setFontSize(9);
-                    doc.setTextColor(100);
-                    doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
-                    doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin.left, footerY);
-                    doc.text(`Standard: ${currentStandard === 'philippine' ? 'PEC' : 'IEC'}`, pageWidth - margin.right, footerY, { align: 'right' });
-                }
-
-                // Section title function
-                function writeSectionTitle(doc, text, startY) {
-                    doc.setFontSize(12);
-                    doc.setFont(undefined, 'bold');
-                    doc.text(text, margin.left, startY);
-                    return startY + 15;
-                }
-
-                // Format number for PDF
-                function formatNumberForPDF(num, decimals = 2) {
-                    if (typeof num !== 'number' || isNaN(num)) return "0";
-                    return num.toLocaleString('en-US', {
-                        minimumFractionDigits: decimals,
-                        maximumFractionDigits: decimals
-                    });
-                }
-
-                // Draw header on first page
-                drawPageHeader(doc);
-
-                let currentY = topMarginForTables;
-
-                // Table 1: Direct Costs
-                currentY = writeSectionTitle(doc, 'BILL OF QUANTITIES - DIRECT COSTS', currentY);
-
-                const directHead = [['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']];
-                const directBody = [];
-                
-                let itemNo = 1;
-                projectData.workItems.forEach(item => {
-                    if (item.quantity > 0) {
-                        directBody.push([
-                            itemNo.toString(),
-                            item.name,
-                            formatNumberForPDF(item.quantity, item.unit === 'pcs' ? 0 : 2),
-                            item.unit,
-                            formatCurrencyForPDF(item.materialCost),
-                            formatNumberForPDF(item.laborHours, 1),
-                            formatCurrencyForPDF(item.laborCost),
-                            formatCurrencyForPDF(item.totalCost)
-                        ]);
-                        itemNo++;
-                    }
-                });
-
-                // Add total row
-                directBody.push([
-                    '',
-                    'TOTAL DIRECT COSTS',
-                    '',
-                    '',
-                    formatCurrencyForPDF(projectData.totals.totalMaterialCost),
-                    formatNumberForPDF(projectData.totals.totalLaborHours, 1),
-                    formatCurrencyForPDF(projectData.totals.totalLaborCost),
-                    formatCurrencyForPDF(projectData.totals.totalDirectCost)
-                ]);
-
-                doc.autoTable({
-                    head: directHead,
-                    body: directBody,
-                    startY: currentY,
-                    margin: { left: margin.left, right: margin.right, top: currentY },
-                    styles: {
-                        fontSize: 8,
-                        cellPadding: 3,
-                        overflow: 'linebreak',
-                        lineWidth: 0.25,
-                        lineColor: 100
-                    },
-                    headStyles: {
-                        fillColor: [44, 62, 80],
-                        textColor: 255,
-                        fontStyle: 'bold',
-                        halign: 'center'
-                    },
-                    bodyStyles: {
-                        halign: 'left'
-                    },
-                    columnStyles: {
-                        0: { halign: 'center', cellWidth: 45 },
-                        1: { cellWidth: 150 },
-                        2: { halign: 'center', cellWidth: 45 },
-                        3: { halign: 'center', cellWidth: 35 },
-                        4: { halign: 'right', cellWidth: 65 },
-                        5: { halign: 'right', cellWidth: 50 },
-                        6: { halign: 'right', cellWidth: 65 },
-                        7: { halign: 'right', cellWidth: 65 }
-                    },
-                    didDrawPage: function(data) {
-                        // Draw header on every page
-                        drawPageHeader(doc);
-                        
-                        // Draw footer on every page
-                        const pageNumber = data.pageNumber;
-                        const totalPages = doc.internal.getNumberOfPages();
-                        drawPageFooter(doc, pageNumber, totalPages);
-                    }
-                });
-
-                // Table 2: Indirect Costs
-                currentY = doc.lastAutoTable.finalY + 20;
-                
-                // Check if we need a new page
-                if (currentY > pageHeight - 200) {
-                    doc.addPage();
-                    currentY = topMarginForTables;
-                    drawPageHeader(doc);
-                }
-
-                currentY = writeSectionTitle(doc, 'INDIRECT COSTS & MARKUP', currentY);
-
-                const indirectBody = [];
-                itemNo = 1;
-
-                // Permits
-                if (projectData.parameters.permitsCost > 0) {
-                    indirectBody.push([
-                        itemNo.toString(),
-                        'Permits & Fees',
-                        '1',
-                        'lot',
-                        formatCurrencyForPDF(projectData.parameters.permitsCost),
-                        '',
-                        '',
-                        formatCurrencyForPDF(projectData.parameters.permitsCost)
-                    ]);
-                    itemNo++;
-                }
-
-                // Overhead
-                indirectBody.push([
-                    itemNo.toString(),
-                    `Overhead (${projectData.parameters.overheadRate}%)`,
-                    '1',
-                    'lot',
-                    formatCurrencyForPDF(projectData.totals.overheadCost),
-                    '',
-                    '',
-                    formatCurrencyForPDF(projectData.totals.overheadCost)
-                ]);
-                itemNo++;
-
-                // Contingency
-                indirectBody.push([
-                    itemNo.toString(),
-                    `Contingency (${projectData.parameters.contingencyRate}%)`,
-                    '1',
-                    'lot',
-                    formatCurrencyForPDF(projectData.totals.contingencyCost),
-                    '',
-                    '',
-                    formatCurrencyForPDF(projectData.totals.contingencyCost)
-                ]);
-                itemNo++;
-
-                // Profit
-                indirectBody.push([
-                    itemNo.toString(),
-                    `Profit Margin (${projectData.parameters.profitMarginRate}%)`,
-                    '1',
-                    'lot',
-                    formatCurrencyForPDF(projectData.totals.profit),
-                    '',
-                    '',
-                    formatCurrencyForPDF(projectData.totals.profit)
-                ]);
-                itemNo++;
-
-                // Tax
-                indirectBody.push([
-                    itemNo.toString(),
-                    `Tax (VAT) (${projectData.parameters.taxRate}%)`,
-                    '1',
-                    'lot',
-                    formatCurrencyForPDF(projectData.totals.tax),
-                    '',
-                    '',
-                    formatCurrencyForPDF(projectData.totals.tax)
-                ]);
-
-                // Total indirect
-                const totalIndirect = projectData.totals.totalIndirectCost + projectData.totals.profit + projectData.totals.tax;
-                indirectBody.push([
-                    '',
-                    'TOTAL INDIRECT COSTS & MARKUP',
-                    '',
-                    '',
-                    formatCurrencyForPDF(totalIndirect),
-                    '',
-                    '',
-                    formatCurrencyForPDF(totalIndirect)
-                ]);
-
-                doc.autoTable({
-                    head: directHead, // Reuse same header
-                    body: indirectBody,
-                    startY: currentY,
-                    margin: { left: margin.left, right: margin.right, top: currentY },
-                    styles: {
-                        fontSize: 8,
-                        cellPadding: 3,
-                        overflow: 'linebreak',
-                        lineWidth: 0.25,
-                        lineColor: 100
-                    },
-                    headStyles: {
-                        fillColor: [44, 62, 80],
-                        textColor: 255,
-                        fontStyle: 'bold',
-                        halign: 'center'
-                    },
-                    bodyStyles: {
-                        halign: 'left'
-                    },
-                    columnStyles: {
-                        0: { halign: 'center', cellWidth: 45 },
-                        1: { cellWidth: 150 },
-                        2: { halign: 'center', cellWidth: 45 },
-                        3: { halign: 'center', cellWidth: 35 },
-                        4: { halign: 'right', cellWidth: 65 },
-                        5: { halign: 'right', cellWidth: 50 },
-                        6: { halign: 'right', cellWidth: 65 },
-                        7: { halign: 'right', cellWidth: 65 }
-                    },
-                    didDrawPage: function(data) {
-                        drawPageHeader(doc);
-                        const pageNumber = data.pageNumber;
-                        const totalPages = doc.internal.getNumberOfPages();
-                        drawPageFooter(doc, pageNumber, totalPages);
-                    }
-                });
-
-                // Table 3: Summary
-                currentY = doc.lastAutoTable.finalY + 20;
-                
-                // Check if we need a new page
-                if (currentY > pageHeight - 150) {
-                    doc.addPage();
-                    currentY = topMarginForTables;
-                    drawPageHeader(doc);
-                }
-
-                currentY = writeSectionTitle(doc, 'SUMMARY', currentY);
-
-                const summaryHead = [['Category', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']];
-                const summaryBody = [
-                    [
-                        'TOTAL DIRECT COSTS',
-                        formatCurrencyForPDF(projectData.totals.totalMaterialCost),
-                        formatNumberForPDF(projectData.totals.totalLaborHours, 1),
-                        formatCurrencyForPDF(projectData.totals.totalLaborCost),
-                        formatCurrencyForPDF(projectData.totals.totalDirectCost)
-                    ],
-                    [
-                        'TOTAL INDIRECT COSTS & MARKUP',
-                        formatCurrencyForPDF(totalIndirect),
-                        '',
-                        '',
-                        formatCurrencyForPDF(totalIndirect)
-                    ],
-                    [
-                        'GRAND TOTAL',
-                        formatCurrencyForPDF(projectData.totals.totalMaterialCost + totalIndirect),
-                        formatNumberForPDF(projectData.totals.totalLaborHours, 1),
-                        formatCurrencyForPDF(projectData.totals.totalLaborCost),
-                        formatCurrencyForPDF(projectData.totals.finalPrice)
-                    ]
-                ];
-
-                doc.autoTable({
-                    head: summaryHead,
-                    body: summaryBody,
-                    startY: currentY,
-                    margin: { left: margin.left, right: margin.right, top: currentY },
-                    styles: {
-                        fontSize: 9,
-                        cellPadding: 4,
-                        lineWidth: 0.25,
-                        lineColor: 100
-                    },
-                    headStyles: {
-                        fillColor: [44, 62, 80],
-                        textColor: 255,
-                        fontStyle: 'bold',
-                        halign: 'center'
-                    },
-                    bodyStyles: {
-                        halign: 'left'
-                    },
-                    columnStyles: {
-                        0: { cellWidth: 180, fontStyle: 'bold' },
-                        1: { halign: 'right', cellWidth: 80 },
-                        2: { halign: 'right', cellWidth: 60 },
-                        3: { halign: 'right', cellWidth: 80 },
-                        4: { halign: 'right', cellWidth: 80, fontStyle: 'bold' }
-                    },
-                    didDrawPage: function(data) {
-                        drawPageHeader(doc);
-                        const pageNumber = data.pageNumber;
-                        const totalPages = doc.internal.getNumberOfPages();
-                        drawPageFooter(doc, pageNumber, totalPages);
-                    }
-                });
-
-                // Save the PDF
-                const fileName = (projectData.projectName || 'estimate').replace(/[^a-z0-9]/gi, '_') + '_power_distribution_estimate.pdf';
-                doc.save(fileName);
-
-            } catch (err) {
-                console.error('PDF Generation Error:', err);
-                alert('Error generating PDF: ' + err.message);
-            }
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            
+            // Project info
+            const projectName = document.getElementById('projectName').value || 'Unnamed Project';
+            const clientName = document.getElementById('clientName').value || 'Not specified';
+            const preparedBy = document.getElementById('preparedBy').value || 'Not specified';
+            const dateStr = document.getElementById('projectDate').value || '';
+            
+            doc.text(`Project: ${projectName}`, margin.left, headerY + 20);
+            doc.text(`Client: ${clientName}`, margin.left, headerY + 35);
+            doc.text(`Prepared By: ${preparedBy}`, pageWidth - margin.right, headerY + 20, { align: 'right' });
+            doc.text(`Date: ${dateStr}`, pageWidth - margin.right, headerY + 35, { align: 'right' });
+            
+            // Draw a line under header
+            doc.setLineWidth(0.5);
+            doc.line(margin.left, headerY + 45, pageWidth - margin.right, headerY + 45);
         }
+
+        // Footer function - called manually
+        function drawPageFooter(pageNumber, totalPages) {
+            const footerY = pageHeight - 30;
+            
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
+            doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin.left, footerY);
+            doc.text(`Standard: ${currentStandard === 'philippine' ? 'PEC' : 'IEC'}`, pageWidth - margin.right, footerY, { align: 'right' });
+        }
+
+        // Section title function - updates currentY
+        function writeSectionTitle(text) {
+            // Check if we need a new page
+            if (currentY > pageHeight - 150) {
+                doc.addPage();
+                currentY = margin.top;
+                drawPageHeader();
+            }
+            
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(text, margin.left, currentY);
+            currentY += 20; // Move down for the table
+            return currentY;
+        }
+
+        // Format number for PDF
+        function formatNumberForPDF(num, decimals = 2) {
+            if (typeof num !== 'number' || isNaN(num)) return "0";
+            return num.toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        // Draw header on first page
+        drawPageHeader();
+        currentY = margin.top + 60; // Start below header
+
+        // Table 1: Direct Costs
+        writeSectionTitle('BILL OF QUANTITIES - DIRECT COSTS');
+
+        const directHead = [['Item No.', 'Scope of Work', 'Quantity', 'Unit', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']];
+        const directBody = [];
+        
+        let itemNo = 1;
+        projectData.workItems.forEach(item => {
+            if (item.quantity > 0) {
+                directBody.push([
+                    itemNo.toString(),
+                    item.name,
+                    formatNumberForPDF(item.quantity, item.unit === 'pcs' ? 0 : 2),
+                    item.unit,
+                    formatCurrencyForPDF(item.materialCost),
+                    formatNumberForPDF(item.laborHours, 1),
+                    formatCurrencyForPDF(item.laborCost),
+                    formatCurrencyForPDF(item.totalCost)
+                ]);
+                itemNo++;
+            }
+        });
+
+        // Add total row
+        directBody.push([
+            '',
+            'TOTAL DIRECT COSTS',
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.totalMaterialCost),
+            formatNumberForPDF(projectData.totals.totalLaborHours, 1),
+            formatCurrencyForPDF(projectData.totals.totalLaborCost),
+            formatCurrencyForPDF(projectData.totals.totalDirectCost)
+        ]);
+
+        doc.autoTable({
+            head: directHead,
+            body: directBody,
+            startY: currentY,
+            margin: { left: margin.left, right: margin.right },
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                lineWidth: 0.25,
+                lineColor: 100
+            },
+            headStyles: {
+                fillColor: [44, 62, 80],
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 45 },
+                1: { cellWidth: 150 },
+                2: { halign: 'center', cellWidth: 45 },
+                3: { halign: 'center', cellWidth: 35 },
+                4: { halign: 'right', cellWidth: 65 },
+                5: { halign: 'right', cellWidth: 50 },
+                6: { halign: 'right', cellWidth: 65 },
+                7: { halign: 'right', cellWidth: 65 }
+            },
+            // Remove didDrawPage to avoid conflicts
+            didDrawPage: null
+        });
+
+        // Update currentY after table
+        currentY = doc.lastAutoTable.finalY + 20;
+
+        // Table 2: Indirect Costs
+        writeSectionTitle('INDIRECT COSTS & MARKUP');
+
+        const indirectBody = [];
+        itemNo = 1;
+
+        // Permits
+        if (projectData.parameters.permitsCost > 0) {
+            indirectBody.push([
+                itemNo.toString(),
+                'Permits & Fees',
+                '1',
+                'lot',
+                formatCurrencyForPDF(projectData.parameters.permitsCost),
+                '',
+                '',
+                formatCurrencyForPDF(projectData.parameters.permitsCost)
+            ]);
+            itemNo++;
+        }
+
+        // Overhead
+        indirectBody.push([
+            itemNo.toString(),
+            `Overhead (${projectData.parameters.overheadRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.overheadCost),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.overheadCost)
+        ]);
+        itemNo++;
+
+        // Contingency
+        indirectBody.push([
+            itemNo.toString(),
+            `Contingency (${projectData.parameters.contingencyRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.contingencyCost),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.contingencyCost)
+        ]);
+        itemNo++;
+
+        // Profit
+        indirectBody.push([
+            itemNo.toString(),
+            `Profit Margin (${projectData.parameters.profitMarginRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.profit),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.profit)
+        ]);
+        itemNo++;
+
+        // Tax
+        indirectBody.push([
+            itemNo.toString(),
+            `Tax (VAT) (${projectData.parameters.taxRate}%)`,
+            '1',
+            'lot',
+            formatCurrencyForPDF(projectData.totals.tax),
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.tax)
+        ]);
+
+        // Total indirect
+        const totalIndirect = projectData.totals.totalIndirectCost + projectData.totals.profit + projectData.totals.tax;
+        indirectBody.push([
+            '',
+            'TOTAL INDIRECT COSTS & MARKUP',
+            '',
+            '',
+            formatCurrencyForPDF(totalIndirect),
+            '',
+            '',
+            formatCurrencyForPDF(totalIndirect)
+        ]);
+
+        doc.autoTable({
+            head: directHead, // Reuse same header
+            body: indirectBody,
+            startY: currentY,
+            margin: { left: margin.left, right: margin.right },
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                overflow: 'linebreak',
+                lineWidth: 0.25,
+                lineColor: 100
+            },
+            headStyles: {
+                fillColor: [44, 62, 80],
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 45 },
+                1: { cellWidth: 150 },
+                2: { halign: 'center', cellWidth: 45 },
+                3: { halign: 'center', cellWidth: 35 },
+                4: { halign: 'right', cellWidth: 65 },
+                5: { halign: 'right', cellWidth: 50 },
+                6: { halign: 'right', cellWidth: 65 },
+                7: { halign: 'right', cellWidth: 65 }
+            },
+            didDrawPage: null
+        });
+
+        // Update currentY after table
+        currentY = doc.lastAutoTable.finalY + 20;
+
+        // Table 3: Summary
+        writeSectionTitle('SUMMARY');
+
+        const summaryHead = [['Category', 'Material Cost', 'Labor Hours', 'Labor Cost', 'Total Cost']];
+        const summaryBody = [
+            [
+                'TOTAL DIRECT COSTS',
+                formatCurrencyForPDF(projectData.totals.totalMaterialCost),
+                formatNumberForPDF(projectData.totals.totalLaborHours, 1),
+                formatCurrencyForPDF(projectData.totals.totalLaborCost),
+                formatCurrencyForPDF(projectData.totals.totalDirectCost)
+            ],
+            [
+                'TOTAL INDIRECT COSTS & MARKUP',
+                formatCurrencyForPDF(totalIndirect),
+                '',
+                '',
+                formatCurrencyForPDF(totalIndirect)
+            ],
+            [
+                'GRAND TOTAL',
+                formatCurrencyForPDF(projectData.totals.totalMaterialCost + totalIndirect),
+                formatNumberForPDF(projectData.totals.totalLaborHours, 1),
+                formatCurrencyForPDF(projectData.totals.totalLaborCost),
+                formatCurrencyForPDF(projectData.totals.finalPrice)
+            ]
+        ];
+
+        doc.autoTable({
+            head: summaryHead,
+            body: summaryBody,
+            startY: currentY,
+            margin: { left: margin.left, right: margin.right },
+            styles: {
+                fontSize: 9,
+                cellPadding: 4,
+                lineWidth: 0.25,
+                lineColor: 100
+            },
+            headStyles: {
+                fillColor: [44, 62, 80],
+                textColor: 255,
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { cellWidth: 180, fontStyle: 'bold' },
+                1: { halign: 'right', cellWidth: 80 },
+                2: { halign: 'right', cellWidth: 60 },
+                3: { halign: 'right', cellWidth: 80 },
+                4: { halign: 'right', cellWidth: 80, fontStyle: 'bold' }
+            },
+            didDrawPage: null
+        });
+
+        // Manually draw footers on all pages
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            drawPageFooter(i, totalPages);
+        }
+
+        // Save the PDF
+        const fileName = (projectData.projectName || 'estimate').replace(/[^a-z0-9]/gi, '_') + '_power_distribution_estimate.pdf';
+        doc.save(fileName);
+
+    } catch (err) {
+        console.error('PDF Generation Error:', err);
+        alert('Error generating PDF: ' + err.message);
+    }
+}
 
         function exportToExcel() {
             if (!projectData.totals) {
