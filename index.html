@@ -1842,7 +1842,7 @@ function exportToPdf() {
         // Define column widths (total ~510pt to fit A4 page width of 595pt - 80pt margins)
         const columnWidths = {
             itemNo: 40,
-            scope: 120,
+            scope: 130,
             quantity: 50,
             unit: 40,
             materialCost: 80,
@@ -1903,21 +1903,22 @@ function exportToPdf() {
                 fillColor: [44, 62, 80],
                 textColor: 255,
                 fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8
+                fontSize: 8,
+                halign: 'left' // Left-align header for consistency
             },
             bodyStyles: {
-                fontSize: 8
+                fontSize: 8,
+                halign: 'left' // Left-align all body cells
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: columnWidths.itemNo },
+                0: { cellWidth: columnWidths.itemNo },
                 1: { cellWidth: columnWidths.scope, overflow: 'linebreak' },
-                2: { halign: 'center', cellWidth: columnWidths.quantity },
-                3: { halign: 'center', cellWidth: columnWidths.unit },
-                4: { halign: 'right', cellWidth: columnWidths.materialCost },
-                5: { halign: 'right', cellWidth: columnWidths.laborHours },
-                6: { halign: 'right', cellWidth: columnWidths.laborCost },
-                7: { halign: 'right', cellWidth: columnWidths.totalCost }
+                2: { cellWidth: columnWidths.quantity },
+                3: { cellWidth: columnWidths.unit },
+                4: { cellWidth: columnWidths.materialCost },
+                5: { cellWidth: columnWidths.laborHours },
+                6: { cellWidth: columnWidths.laborCost },
+                7: { cellWidth: columnWidths.totalCost }
             }
         });
 
@@ -2020,21 +2021,22 @@ function exportToPdf() {
                 fillColor: [44, 62, 80],
                 textColor: 255,
                 fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8
+                fontSize: 8,
+                halign: 'left'
             },
             bodyStyles: {
-                fontSize: 8
+                fontSize: 8,
+                halign: 'left'
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: columnWidths.itemNo },
+                0: { cellWidth: columnWidths.itemNo },
                 1: { cellWidth: columnWidths.scope, overflow: 'linebreak' },
-                2: { halign: 'center', cellWidth: columnWidths.quantity },
-                3: { halign: 'center', cellWidth: columnWidths.unit },
-                4: { halign: 'right', cellWidth: columnWidths.materialCost },
-                5: { halign: 'right', cellWidth: columnWidths.laborHours },
-                6: { halign: 'right', cellWidth: columnWidths.laborCost },
-                7: { halign: 'right', cellWidth: columnWidths.totalCost }
+                2: { cellWidth: columnWidths.quantity },
+                3: { cellWidth: columnWidths.unit },
+                4: { cellWidth: columnWidths.materialCost },
+                5: { cellWidth: columnWidths.laborHours },
+                6: { cellWidth: columnWidths.laborCost },
+                7: { cellWidth: columnWidths.totalCost }
             }
         });
 
@@ -2086,18 +2088,19 @@ function exportToPdf() {
                 fillColor: [44, 62, 80],
                 textColor: 255,
                 fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8
+                fontSize: 8,
+                halign: 'left'
             },
             bodyStyles: {
-                fontSize: 8
+                fontSize: 8,
+                halign: 'left'
             },
             columnStyles: {
                 0: { cellWidth: columnWidths.scope + columnWidths.itemNo, overflow: 'linebreak' },
-                1: { halign: 'right', cellWidth: columnWidths.materialCost },
-                2: { halign: 'right', cellWidth: columnWidths.laborHours },
-                3: { halign: 'right', cellWidth: columnWidths.laborCost },
-                4: { halign: 'right', cellWidth: columnWidths.totalCost, fontStyle: 'bold' }
+                1: { cellWidth: columnWidths.materialCost },
+                2: { cellWidth: columnWidths.laborHours },
+                3: { cellWidth: columnWidths.laborCost },
+                4: { cellWidth: columnWidths.totalCost, fontStyle: 'bold' }
             }
         });
 
@@ -2117,7 +2120,6 @@ function exportToPdf() {
         alert('Error generating PDF: ' + err.message);
     }
 }
-
         function exportToExcel() {
             if (!projectData.totals) {
                 alert('No results to export. Please calculate an estimate first.');
