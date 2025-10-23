@@ -1721,37 +1721,37 @@
             }
         }
 
-        // Currency functions for PDF
-        function getSelectedCurrency() {
-            const c = document.getElementById('currency')?.value || 'PHP';
-            return c;
-        }
+// Currency functions for PDF
+function getSelectedCurrency() {
+    const c = document.getElementById('currency')?.value || 'PHP';
+    return c;
+}
 
-        function getCurrencySymbol(c) {
-            switch (c) {
-                case 'PHP': return '₱';
-                case 'USD': return '$';
-                case 'EUR': return '€';
-                case 'JPY': return '¥';
-                default:    return c + ' ';
-            }
-        }
+function getCurrencySymbol(c) {
+    switch (c) {
+        case 'PHP': return '₱';
+        case 'USD': return '$';
+        case 'EUR': return '€';
+        case 'JPY': return '¥';
+        default:    return c + ' ';
+    }
+}
 
-        function formatCurrencyForPDF(n) {
-            if (typeof n !== 'number' || isNaN(n)) return '';
-            const c = getSelectedCurrency();
-            const symbol = getCurrencySymbol(c);
+function formatCurrencyForPDF(n) {
+    if (typeof n !== 'number' || isNaN(n)) return '0.00';
+    const c = getSelectedCurrency();
+    const symbol = getCurrencySymbol(c);
 
-            // Choose a locale that prints thousands and decimals consistently.
-            const formatted = n.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
+    // Ensure consistent number formatting
+    const formatted = n.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 
-            return symbol + ' ' + formatted;
-        }
+    return `${symbol}${formatted}`;
+}
 
-        function exportToPdf() {
+function exportToPdf() {
     const { jsPDF } = window.jspdf;
     
     if (!projectData.totals) {
@@ -1760,29 +1760,33 @@
     }
 
     try {
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+        const doc = new jsPDF({ 
+            orientation: 'portrait', 
+            unit: 'pt', 
+            format: 'a4'
+        });
+
+        // Set font to support Unicode characters
+        doc.setFont('helvetica', 'normal');
 
         // Page dimensions and margins
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = { left: 40, right: 40, top: 80, bottom: 60 };
         
-        // Track current Y position manually
+        // Track current Y position
         let currentY = margin.top;
 
-        // Header function - called manually
+        // Header function
         function drawPageHeader() {
             const headerY = 30;
-
-            // Title
             doc.setFontSize(16);
-            doc.setFont(undefined, 'bold');
+            doc.setFont('helvetica', 'bold');
             doc.text('POWER DISTRIBUTION SYSTEMS ESTIMATE', pageWidth / 2, headerY, { align: 'center' });
             
             doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
+            doc.setFont('helvetica', 'normal');
             
-            // Project info
             const projectName = document.getElementById('projectName').value || 'Unnamed Project';
             const clientName = document.getElementById('clientName').value || 'Not specified';
             const preparedBy = document.getElementById('preparedBy').value || 'Not specified';
@@ -1793,15 +1797,13 @@
             doc.text(`Prepared By: ${preparedBy}`, pageWidth - margin.right, headerY + 20, { align: 'right' });
             doc.text(`Date: ${dateStr}`, pageWidth - margin.right, headerY + 35, { align: 'right' });
             
-            // Draw a line under header
             doc.setLineWidth(0.5);
             doc.line(margin.left, headerY + 45, pageWidth - margin.right, headerY + 45);
         }
 
-        // Footer function - called manually
+        // Footer function
         function drawPageFooter(pageNumber, totalPages) {
             const footerY = pageHeight - 30;
-            
             doc.setFontSize(9);
             doc.setTextColor(100);
             doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
@@ -1809,9 +1811,8 @@
             doc.text(`Standard: ${currentStandard === 'philippine' ? 'PEC' : 'IEC'}`, pageWidth - margin.right, footerY, { align: 'right' });
         }
 
-        // Section title function - updates currentY
+        // Section title function
         function writeSectionTitle(text) {
-            // Check if we need a new page
             if (currentY > pageHeight - 150) {
                 doc.addPage();
                 currentY = margin.top;
@@ -1819,9 +1820,9 @@
             }
             
             doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
+            doc.setFont('helvetica', 'bold');
             doc.text(text, margin.left, currentY);
-            currentY += 20; // Move down for the table
+            currentY += 20;
             return currentY;
         }
 
@@ -1836,7 +1837,19 @@
 
         // Draw header on first page
         drawPageHeader();
-        currentY = margin.top + 60; // Start below header
+        currentY = margin.top + 60;
+
+        // Define column widths (total ~510pt to fit A4 page width of 595pt - 80pt margins)
+        const columnWidths = {
+            itemNo: 40,
+            scope: 120,
+            quantity: 50,
+            unit: 40,
+            materialCost: 80,
+            laborHours: 60,
+            laborCost: 80,
+            totalCost: 80
+        };
 
         // Table 1: Direct Costs
         writeSectionTitle('BILL OF QUANTITIES - DIRECT COSTS');
@@ -1861,7 +1874,6 @@
             }
         });
 
-        // Add total row
         directBody.push([
             '',
             'TOTAL DIRECT COSTS',
@@ -1879,9 +1891,11 @@
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
+                font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 3,
+                cellPadding: 4,
                 overflow: 'linebreak',
+                minCellHeight: 12,
                 lineWidth: 0.25,
                 lineColor: 100
             },
@@ -1889,26 +1903,24 @@
                 fillColor: [44, 62, 80],
                 textColor: 255,
                 fontStyle: 'bold',
-                halign: 'center'
+                halign: 'center',
+                fontSize: 8
             },
             bodyStyles: {
-                halign: 'left'
+                fontSize: 8
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 45 },
-                1: { cellWidth: 150 },
-                2: { halign: 'center', cellWidth: 45 },
-                3: { halign: 'center', cellWidth: 35 },
-                4: { halign: 'right', cellWidth: 65 },
-                5: { halign: 'right', cellWidth: 50 },
-                6: { halign: 'right', cellWidth: 65 },
-                7: { halign: 'right', cellWidth: 65 }
-            },
-            // Remove didDrawPage to avoid conflicts
-            didDrawPage: null
+                0: { halign: 'center', cellWidth: columnWidths.itemNo },
+                1: { cellWidth: columnWidths.scope, overflow: 'linebreak' },
+                2: { halign: 'center', cellWidth: columnWidths.quantity },
+                3: { halign: 'center', cellWidth: columnWidths.unit },
+                4: { halign: 'right', cellWidth: columnWidths.materialCost },
+                5: { halign: 'right', cellWidth: columnWidths.laborHours },
+                6: { halign: 'right', cellWidth: columnWidths.laborCost },
+                7: { halign: 'right', cellWidth: columnWidths.totalCost }
+            }
         });
 
-        // Update currentY after table
         currentY = doc.lastAutoTable.finalY + 20;
 
         // Table 2: Indirect Costs
@@ -1917,7 +1929,6 @@
         const indirectBody = [];
         itemNo = 1;
 
-        // Permits
         if (projectData.parameters.permitsCost > 0) {
             indirectBody.push([
                 itemNo.toString(),
@@ -1932,7 +1943,6 @@
             itemNo++;
         }
 
-        // Overhead
         indirectBody.push([
             itemNo.toString(),
             `Overhead (${projectData.parameters.overheadRate}%)`,
@@ -1945,7 +1955,6 @@
         ]);
         itemNo++;
 
-        // Contingency
         indirectBody.push([
             itemNo.toString(),
             `Contingency (${projectData.parameters.contingencyRate}%)`,
@@ -1958,7 +1967,6 @@
         ]);
         itemNo++;
 
-        // Profit
         indirectBody.push([
             itemNo.toString(),
             `Profit Margin (${projectData.parameters.profitMarginRate}%)`,
@@ -1971,7 +1979,6 @@
         ]);
         itemNo++;
 
-        // Tax
         indirectBody.push([
             itemNo.toString(),
             `Tax (VAT) (${projectData.parameters.taxRate}%)`,
@@ -1983,7 +1990,6 @@
             formatCurrencyForPDF(projectData.totals.tax)
         ]);
 
-        // Total indirect
         const totalIndirect = projectData.totals.totalIndirectCost + projectData.totals.profit + projectData.totals.tax;
         indirectBody.push([
             '',
@@ -1997,14 +2003,16 @@
         ]);
 
         doc.autoTable({
-            head: directHead, // Reuse same header
+            head: directHead,
             body: indirectBody,
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
+                font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 3,
+                cellPadding: 4,
                 overflow: 'linebreak',
+                minCellHeight: 12,
                 lineWidth: 0.25,
                 lineColor: 100
             },
@@ -2012,25 +2020,24 @@
                 fillColor: [44, 62, 80],
                 textColor: 255,
                 fontStyle: 'bold',
-                halign: 'center'
+                halign: 'center',
+                fontSize: 8
             },
             bodyStyles: {
-                halign: 'left'
+                fontSize: 8
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 45 },
-                1: { cellWidth: 150 },
-                2: { halign: 'center', cellWidth: 45 },
-                3: { halign: 'center', cellWidth: 35 },
-                4: { halign: 'right', cellWidth: 65 },
-                5: { halign: 'right', cellWidth: 50 },
-                6: { halign: 'right', cellWidth: 65 },
-                7: { halign: 'right', cellWidth: 65 }
-            },
-            didDrawPage: null
+                0: { halign: 'center', cellWidth: columnWidths.itemNo },
+                1: { cellWidth: columnWidths.scope, overflow: 'linebreak' },
+                2: { halign: 'center', cellWidth: columnWidths.quantity },
+                3: { halign: 'center', cellWidth: columnWidths.unit },
+                4: { halign: 'right', cellWidth: columnWidths.materialCost },
+                5: { halign: 'right', cellWidth: columnWidths.laborHours },
+                6: { halign: 'right', cellWidth: columnWidths.laborCost },
+                7: { halign: 'right', cellWidth: columnWidths.totalCost }
+            }
         });
 
-        // Update currentY after table
         currentY = doc.lastAutoTable.finalY + 20;
 
         // Table 3: Summary
@@ -2067,8 +2074,11 @@
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                fontSize: 9,
+                font: 'helvetica',
+                fontSize: 8,
                 cellPadding: 4,
+                overflow: 'linebreak',
+                minCellHeight: 12,
                 lineWidth: 0.25,
                 lineColor: 100
             },
@@ -2076,22 +2086,22 @@
                 fillColor: [44, 62, 80],
                 textColor: 255,
                 fontStyle: 'bold',
-                halign: 'center'
+                halign: 'center',
+                fontSize: 8
             },
             bodyStyles: {
-                halign: 'left'
+                fontSize: 8
             },
             columnStyles: {
-                0: { cellWidth: 180, fontStyle: 'bold' },
-                1: { halign: 'right', cellWidth: 80 },
-                2: { halign: 'right', cellWidth: 60 },
-                3: { halign: 'right', cellWidth: 80 },
-                4: { halign: 'right', cellWidth: 80, fontStyle: 'bold' }
-            },
-            didDrawPage: null
+                0: { cellWidth: columnWidths.scope + columnWidths.itemNo, overflow: 'linebreak' },
+                1: { halign: 'right', cellWidth: columnWidths.materialCost },
+                2: { halign: 'right', cellWidth: columnWidths.laborHours },
+                3: { halign: 'right', cellWidth: columnWidths.laborCost },
+                4: { halign: 'right', cellWidth: columnWidths.totalCost, fontStyle: 'bold' }
+            }
         });
 
-        // Manually draw footers on all pages
+        // Add footers to all pages
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
