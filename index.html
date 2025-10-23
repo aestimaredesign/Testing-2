@@ -1841,14 +1841,14 @@ function exportToPdf() {
 
         // Define column widths (total ~510pt to fit A4 page width of 595pt - 80pt margins)
         const columnWidths = {
-            itemNo: 40,
-            scope: 130,
-            quantity: 50,
-            unit: 40,
-            materialCost: 80,
-            laborHours: 60,
-            laborCost: 80,
-            totalCost: 80
+            itemNo: 35,
+            scope: 120,
+            quantity: 45,
+            unit: 35,
+            materialCost: 75,
+            laborHours: 55,
+            laborCost: 75,
+            totalCost: 75
         };
 
         // Table 1: Direct Costs
@@ -1893,9 +1893,9 @@ function exportToPdf() {
             styles: {
                 font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 4,
+                cellPadding: 3,
                 overflow: 'linebreak',
-                minCellHeight: 12,
+                minCellHeight: 10,
                 lineWidth: 0.25,
                 lineColor: 100
             },
@@ -1904,11 +1904,11 @@ function exportToPdf() {
                 textColor: 255,
                 fontStyle: 'bold',
                 fontSize: 8,
-                halign: 'left' // Left-align header for consistency
+                halign: 'left'
             },
             bodyStyles: {
                 fontSize: 8,
-                halign: 'left' // Left-align all body cells
+                halign: 'left'
             },
             columnStyles: {
                 0: { cellWidth: columnWidths.itemNo },
@@ -2011,9 +2011,9 @@ function exportToPdf() {
             styles: {
                 font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 4,
+                cellPadding: 3,
                 overflow: 'linebreak',
-                minCellHeight: 12,
+                minCellHeight: 10,
                 lineWidth: 0.25,
                 lineColor: 100
             },
@@ -2078,9 +2078,9 @@ function exportToPdf() {
             styles: {
                 font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 4,
+                cellPadding: 3,
                 overflow: 'linebreak',
-                minCellHeight: 12,
+                minCellHeight: 10,
                 lineWidth: 0.25,
                 lineColor: 100
             },
