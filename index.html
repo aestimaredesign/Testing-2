@@ -1766,7 +1766,7 @@ function exportToPdf() {
             format: 'a4'
         });
 
-        // Set font to support Unicode characters
+        // Set font for header (Helvetica for readability)
         doc.setFont('helvetica', 'normal');
 
         // Page dimensions and margins
@@ -1806,6 +1806,7 @@ function exportToPdf() {
             const footerY = pageHeight - 30;
             doc.setFontSize(9);
             doc.setTextColor(100);
+            doc.setFont('helvetica', 'normal');
             doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
             doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin.left, footerY);
             doc.text(`Standard: ${currentStandard === 'philippine' ? 'PEC' : 'IEC'}`, pageWidth - margin.right, footerY, { align: 'right' });
@@ -1842,7 +1843,7 @@ function exportToPdf() {
         // Define column widths (total ~510pt to fit A4 page width of 595pt - 80pt margins)
         const columnWidths = {
             itemNo: 35,
-            scope: 120,
+            scope: 125,
             quantity: 45,
             unit: 35,
             materialCost: 75,
@@ -1891,7 +1892,7 @@ function exportToPdf() {
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'helvetica',
+                font: 'courier', // Monospaced font for consistent spacing
                 fontSize: 8,
                 cellPadding: 3,
                 overflow: 'linebreak',
@@ -1904,7 +1905,8 @@ function exportToPdf() {
                 textColor: 255,
                 fontStyle: 'bold',
                 fontSize: 8,
-                halign: 'left'
+                halign: 'left',
+                font: 'courier'
             },
             bodyStyles: {
                 fontSize: 8,
@@ -2009,7 +2011,7 @@ function exportToPdf() {
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'helvetica',
+                font: 'courier',
                 fontSize: 8,
                 cellPadding: 3,
                 overflow: 'linebreak',
@@ -2022,7 +2024,8 @@ function exportToPdf() {
                 textColor: 255,
                 fontStyle: 'bold',
                 fontSize: 8,
-                halign: 'left'
+                halign: 'left',
+                font: 'courier'
             },
             bodyStyles: {
                 fontSize: 8,
@@ -2076,7 +2079,7 @@ function exportToPdf() {
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'helvetica',
+                font: 'courier',
                 fontSize: 8,
                 cellPadding: 3,
                 overflow: 'linebreak',
@@ -2089,7 +2092,8 @@ function exportToPdf() {
                 textColor: 255,
                 fontStyle: 'bold',
                 fontSize: 8,
-                halign: 'left'
+                halign: 'left',
+                font: 'courier'
             },
             bodyStyles: {
                 fontSize: 8,
