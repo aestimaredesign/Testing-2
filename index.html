@@ -1766,7 +1766,7 @@ function exportToPdf() {
             format: 'a4'
         });
 
-        // Set font for header (Helvetica for readability)
+        // Set font for document
         doc.setFont('helvetica', 'normal');
 
         // Page dimensions and margins
@@ -1842,14 +1842,14 @@ function exportToPdf() {
 
         // Define column widths (total ~510pt to fit A4 page width of 595pt - 80pt margins)
         const columnWidths = {
-            itemNo: 35,
-            scope: 125,
-            quantity: 45,
-            unit: 35,
-            materialCost: 75,
-            laborHours: 55,
-            laborCost: 75,
-            totalCost: 75
+            itemNo: 30,
+            scope: 120,
+            quantity: 40,
+            unit: 30,
+            materialCost: 70,
+            laborHours: 50,
+            laborCost: 70,
+            totalCost: 70
         };
 
         // Table 1: Direct Costs
@@ -1892,9 +1892,9 @@ function exportToPdf() {
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'courier', // Monospaced font for consistent spacing
+                font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 3,
+                cellPadding: 2,
                 overflow: 'linebreak',
                 minCellHeight: 10,
                 lineWidth: 0.25,
@@ -1906,7 +1906,7 @@ function exportToPdf() {
                 fontStyle: 'bold',
                 fontSize: 8,
                 halign: 'left',
-                font: 'courier'
+                font: 'helvetica'
             },
             bodyStyles: {
                 fontSize: 8,
@@ -2011,9 +2011,9 @@ function exportToPdf() {
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'courier',
+                font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 3,
+                cellPadding: 2,
                 overflow: 'linebreak',
                 minCellHeight: 10,
                 lineWidth: 0.25,
@@ -2025,7 +2025,7 @@ function exportToPdf() {
                 fontStyle: 'bold',
                 fontSize: 8,
                 halign: 'left',
-                font: 'courier'
+                font: 'helvetica'
             },
             bodyStyles: {
                 fontSize: 8,
@@ -2079,9 +2079,9 @@ function exportToPdf() {
             startY: currentY,
             margin: { left: margin.left, right: margin.right },
             styles: {
-                font: 'courier',
+                font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 3,
+                cellPadding: 2,
                 overflow: 'linebreak',
                 minCellHeight: 10,
                 lineWidth: 0.25,
@@ -2093,7 +2093,7 @@ function exportToPdf() {
                 fontStyle: 'bold',
                 fontSize: 8,
                 halign: 'left',
-                font: 'courier'
+                font: 'helvetica'
             },
             bodyStyles: {
                 fontSize: 8,
