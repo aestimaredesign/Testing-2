@@ -1779,13 +1779,19 @@ function exportToPdf() {
 
         // Header function
         function drawPageHeader() {
-            const headerY = 30;
+            const headerY = 20;
+            // Add header background
+            doc.setFillColor(240, 240, 240);
+            doc.rect(0, 0, pageWidth, 60, 'F');
+            
             doc.setFontSize(16);
             doc.setFont('helvetica', 'bold');
+            doc.setTextColor(44, 62, 80);
             doc.text('POWER DISTRIBUTION SYSTEMS ESTIMATE', pageWidth / 2, headerY, { align: 'center' });
             
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0, 0, 0);
             
             const projectName = document.getElementById('projectName').value || 'Unnamed Project';
             const clientName = document.getElementById('clientName').value || 'Not specified';
@@ -1798,6 +1804,7 @@ function exportToPdf() {
             doc.text(`Date: ${dateStr}`, pageWidth - margin.right, headerY + 35, { align: 'right' });
             
             doc.setLineWidth(0.5);
+            doc.setDrawColor(44, 62, 80);
             doc.line(margin.left, headerY + 45, pageWidth - margin.right, headerY + 45);
         }
 
@@ -1822,6 +1829,7 @@ function exportToPdf() {
             
             doc.setFontSize(12);
             doc.setFont('helvetica', 'bold');
+            doc.setTextColor(44, 62, 80);
             doc.text(text, margin.left, currentY);
             currentY += 20;
             return currentY;
@@ -1894,7 +1902,7 @@ function exportToPdf() {
             styles: {
                 font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 2,
+                cellPadding: 2.5,
                 overflow: 'linebreak',
                 minCellHeight: 10,
                 lineWidth: 0.25,
@@ -1912,6 +1920,9 @@ function exportToPdf() {
                 fontSize: 8,
                 halign: 'left'
             },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245] // Light gray for alternate rows
+            },
             columnStyles: {
                 0: { cellWidth: columnWidths.itemNo },
                 1: { cellWidth: columnWidths.scope, overflow: 'linebreak' },
@@ -1921,6 +1932,11 @@ function exportToPdf() {
                 5: { cellWidth: columnWidths.laborHours },
                 6: { cellWidth: columnWidths.laborCost },
                 7: { cellWidth: columnWidths.totalCost }
+            },
+            didParseCell: function (data) {
+                if (data.row.section === 'body' && data.row.index === directBody.length - 1) {
+                    data.cell.styles.fontStyle = 'bold'; // Bold total row
+                }
             }
         });
 
@@ -2013,7 +2029,7 @@ function exportToPdf() {
             styles: {
                 font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 2,
+                cellPadding: 2.5,
                 overflow: 'linebreak',
                 minCellHeight: 10,
                 lineWidth: 0.25,
@@ -2031,6 +2047,9 @@ function exportToPdf() {
                 fontSize: 8,
                 halign: 'left'
             },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
             columnStyles: {
                 0: { cellWidth: columnWidths.itemNo },
                 1: { cellWidth: columnWidths.scope, overflow: 'linebreak' },
@@ -2040,6 +2059,11 @@ function exportToPdf() {
                 5: { cellWidth: columnWidths.laborHours },
                 6: { cellWidth: columnWidths.laborCost },
                 7: { cellWidth: columnWidths.totalCost }
+            },
+            didParseCell: function (data) {
+                if (data.row.section === 'body' && data.row.index === indirectBody.length - 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                }
             }
         });
 
@@ -2081,7 +2105,7 @@ function exportToPdf() {
             styles: {
                 font: 'helvetica',
                 fontSize: 8,
-                cellPadding: 2,
+                cellPadding: 2.5,
                 overflow: 'linebreak',
                 minCellHeight: 10,
                 lineWidth: 0.25,
@@ -2099,12 +2123,20 @@ function exportToPdf() {
                 fontSize: 8,
                 halign: 'left'
             },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
             columnStyles: {
                 0: { cellWidth: columnWidths.scope + columnWidths.itemNo, overflow: 'linebreak' },
                 1: { cellWidth: columnWidths.materialCost },
                 2: { cellWidth: columnWidths.laborHours },
                 3: { cellWidth: columnWidths.laborCost },
                 4: { cellWidth: columnWidths.totalCost, fontStyle: 'bold' }
+            },
+            didParseCell: function (data) {
+                if (data.row.section === 'body' && data.row.index === summaryBody.length - 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                }
             }
         });
 
