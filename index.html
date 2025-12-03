@@ -19,9 +19,18 @@
         // Load libraries only when needed
         window.loadLibrary = function(libName) {
             return new Promise((resolve, reject) => {
+                // Check if already loaded
+                if (libName === 'jsPDF' && window.jspdf) return resolve(window.jspdf);
+                if (libName === 'autoTable' && window.jspdf && window.jspdf.AutoTable) return resolve();
+                if (libName === 'xlsx' && window.XLSX) return resolve(window.XLSX);
+                
                 const script = document.createElement('script');
                 script.src = window.lazyLoadConfig[libName];
-                script.onload = () => resolve(window[libName] || window.jspdf);
+                script.onload = () => {
+                    if (libName === 'jsPDF') resolve(window.jspdf);
+                    else if (libName === 'autoTable') resolve();
+                    else resolve(window.XLSX);
+                };
                 script.onerror = reject;
                 document.head.appendChild(script);
             });
@@ -1878,7 +1887,24 @@ const AppState = (function() {
         projectData: {},
         circuitNecResults: {},
         isLoading: false,
-        validationTimeout: null
+        validationTimeout: null,
+        // Global constants
+        BOX_CAPACITIES: {
+            'Utility Box (Standard)': { volume: 18.0, costMultiplier: 1.0, description: 'Standard Utility Box' },
+            'Utility Box (Deep)': { volume: 22.5, costMultiplier: 1.2, description: 'Deep Utility Box' },
+            '4x4 Junction Box (1.5")': { volume: 21.0, costMultiplier: 1.0, description: '4x4" Junction Box (1.5" deep)' },
+            '4x4 Junction Box (2.125")': { volume: 30.3, costMultiplier: 1.4, description: '4x4" Junction Box (2.125" deep)' },
+            '4x4 Square Box (1.5")': { volume: 21.0, costMultiplier: 1.0, description: '4x4" Square Box (1.5" deep)' },
+            '4x4 Square Box (2.125")': { volume: 30.3, costMultiplier: 1.4, description: '4x4" Square Box (2.125" deep)' },
+            'Two Gang Box (Standard)': { volume: 30.0, costMultiplier: 1.0, description: 'Two Gang Box (Standard)' },
+            'Two Gang Box (Deep)': { volume: 42.0, costMultiplier: 1.3, description: 'Two Gang Box (Deep)' }
+        },
+        BOX_TYPE_MAPPINGS: {
+            'Utility Box (Standard)': 'Utility Box (Deep)',
+            '4x4 Junction Box (1.5")': '4x4 Junction Box (2.125")',
+            '4x4 Square Box (1.5")': '4x4 Square Box (2.125")',
+            'Two Gang Box (Standard)': 'Two Gang Box (Deep)'
+        }
     };
 
     return {
@@ -1897,9 +1923,10 @@ const AppState = (function() {
             document.getElementById('dashboardTotalBoxes').textContent = `${totalBoxes} boxes`;
             
             const allCompliant = projectData.circuits?.every(c => c.necResult?.isCompliant) || false;
-            document.getElementById('dashboardNecStatus').textContent = allCompliant ? 'Fully Compliant' : 'Review Required';
-            document.getElementById('dashboardNecStatus').parentElement.classList.toggle('success', allCompliant);
-            document.getElementById('dashboardNecStatus').parentElement.classList.toggle('danger', !allCompliant);
+            const necStatus = document.getElementById('dashboardNecStatus');
+            necStatus.textContent = allCompliant ? 'Fully Compliant' : 'Review Required';
+            necStatus.parentElement.parentElement.classList.toggle('success', allCompliant);
+            necStatus.parentElement.parentElement.classList.toggle('danger', !allCompliant);
             
             const budget = projectData.totals.projectedBudget || 0;
             const currencySymbol = AppState.getCurrencySymbol();
@@ -2437,7 +2464,7 @@ function loadProjectData(projectData) {
 }
 
 // ============================================
-// UTILITY FUNCTIONS (from original)
+// UTILITY FUNCTIONS
 // ============================================
 function safeNumber(v, fallback = 0) {
     if (v === "" || v === null || v === undefined) return fallback;
@@ -2653,7 +2680,12 @@ function validateCircuits() {
         return false;
     }
     
-    return updateCircuitTotals();
+    if (!updateCircuitTotals()) {
+        alert('Please ensure circuit percentages total 100%');
+        return false;
+    }
+    
+    return true;
 }
 
 // ============================================
@@ -2671,28 +2703,93 @@ function showLoading(show) {
 }
 
 // ============================================
-// NEC CALCULATION CONSTANTS
+// NEC CALCULATION FUNCTIONS
 // ============================================
-const BOX_CAPACITIES = {
-    'Utility Box (Standard)': { volume: 18.0, costMultiplier: 1.0, description: 'Standard Utility Box' },
-    'Utility Box (Deep)': { volume: 22.5, costMultiplier: 1.2, description: 'Deep Utility Box' },
-    '4x4 Junction Box (1.5")': { volume: 21.0, costMultiplier: 1.0, description: '4x4" Junction Box (1.5" deep)' },
-    '4x4 Junction Box (2.125")': { volume: 30.3, costMultiplier: 1.4, description: '4x4" Junction Box (2.125" deep)' },
-    '4x4 Square Box (1.5")': { volume: 21.0, costMultiplier: 1.0, description: '4x4" Square Box (1.5" deep)' },
-    '4x4 Square Box (2.125")': { volume: 30.3, costMultiplier: 1.4, description: '4x4" Square Box (2.125" deep)' },
-    'Two Gang Box (Standard)': { volume: 30.0, costMultiplier: 1.0, description: 'Two Gang Box (Standard)' },
-    'Two Gang Box (Deep)': { volume: 42.0, costMultiplier: 1.3, description: 'Two Gang Box (Deep)' }
-};
+function calculateNECBoxFillForCircuit(circuitData) {
+    const conductorSize = circuitData.wireSize;
+    const currentConductors = safeNumber(circuitData.conductors);
+    const groundingConductors = 1;
+    const devicesCount = safeNumber(circuitData.devices);
+    const cableClamps = safeNumber(circuitData.clamps);
+    const pigtails = 2;
+    const safetyFactor = 0.20;
 
-const BOX_TYPE_MAPPINGS = {
-    'Utility Box (Standard)': 'Utility Box (Deep)',
-    '4x4 Junction Box (1.5")': '4x4 Junction Box (2.125")',
-    '4x4 Square Box (1.5")': '4x4 Square Box (2.125")',
-    'Two Gang Box (Standard)': 'Two Gang Box (Deep)'
-};
+    const conductorVolumes = { 
+        '14': 2.0, '12': 2.25, '10': 2.5, '8': 3.0, '6': 5.0 
+    };
+    const volPerConductor = conductorVolumes[conductorSize] || conductorVolumes['12'];
+
+    const currentVolume = (currentConductors + pigtails) * volPerConductor;
+    const groundVolume = volPerConductor;
+    const deviceVolume = devicesCount * 2 * volPerConductor;
+    const clampVolume = cableClamps * volPerConductor;
+
+    const totalVolumeRequired = currentVolume + groundVolume + deviceVolume + clampVolume;
+    const volumeWithSafety = totalVolumeRequired * (1 + safetyFactor);
+
+    const BOX_CAPACITIES = AppState.get('BOX_CAPACITIES');
+    const suitableBoxes = Object.entries(BOX_CAPACITIES)
+        .filter(([boxName, boxData]) => boxData.volume >= volumeWithSafety)
+        .sort((a, b) => a[1].volume - b[1].volume);
+
+    const smallestSuitableBox = suitableBoxes[0];
+    const isCompliant = smallestSuitableBox != undefined;
+
+    const necResult = {
+        conductorSize,
+        currentConductors,
+        pigtails,
+        groundingConductors,
+        devicesCount,
+        cableClamps,
+        volPerConductor,
+        currentVolume,
+        groundVolume,
+        deviceVolume,
+        clampVolume,
+        totalVolumeRequired,
+        volumeWithSafety,
+        safetyFactor: safetyFactor * 100,
+        requiredBoxVolume: volumeWithSafety,
+        smallestSuitableBox: smallestSuitableBox ? smallestSuitableBox[0] : null,
+        smallestSuitableBoxVolume: smallestSuitableBox ? smallestSuitableBox[1].volume : null,
+        isCompliant,
+        suitableBoxes
+    };
+
+    if (!necResult.smallestSuitableBox) {
+        necResult.smallestSuitableBox = 'CUSTOM BOX REQUIRED';
+        necResult.smallestSuitableBoxVolume = necResult.volumeWithSafety;
+        necResult.isCompliant = false;
+    }
+
+    return necResult;
+}
+
+function getNECCompliantBoxesForCircuit(necResult) {
+    if (!necResult) return {};
+    
+    const requiredVolume = necResult.volumeWithSafety;
+    const boxUpgrades = {};
+    const BOX_CAPACITIES = AppState.get('BOX_CAPACITIES');
+    const BOX_TYPE_MAPPINGS = AppState.get('BOX_TYPE_MAPPINGS');
+    
+    Object.entries(BOX_CAPACITIES).forEach(([boxName, boxData]) => {
+        if (boxData.volume < requiredVolume && BOX_TYPE_MAPPINGS[boxName]) {
+            const upgradedBox = BOX_TYPE_MAPPINGS[boxName];
+            const upgradedBoxData = BOX_CAPACITIES[upgradedBox];
+            
+            if (upgradedBoxData && upgradedBoxData.volume >= requiredVolume) {
+                boxUpgrades[boxName] = upgradedBox;
+            }
+        }
+    });
+    
+    return boxUpgrades;
+}
 
 // ============================================
-// MAIN CALCULATION FUNCTION (simplified)
+// MAIN CALCULATION FUNCTION
 // ============================================
 function calculateEstimate() {
     console.log('Calculate button clicked');
@@ -2706,6 +2803,12 @@ function calculateEstimate() {
     // Validate circuits
     if (!validateCircuits()) {
         console.log('Circuit validation failed');
+        return;
+    }
+
+    // Validate distribution
+    if (!validateDistribution()) {
+        alert('Please ensure box distribution percentages total 100%');
         return;
     }
 
@@ -2761,99 +2864,717 @@ function calculateEstimate() {
         });
     });
 
-    // Store in state
-    AppState.set('circuitNecResults', circuitNecResults);
+    // Update circuit summary in General tab
+    updateCircuitSummary(circuitResults, totalOutlets);
     
-    // Continue with rest of calculation (simplified for brevity)
-    // ... [rest of your existing calculateEstimate function] ...
+    // Update NEC results in Circuits tab
+    updateCircuitNecResults(circuitResults);
+
+    // Get other input values
+    const wastage = parseFloat(document.getElementById('wastage').value) / 100;
+    const overheadRate = parseFloat(document.getElementById('overheadRate').value) / 100;
+    const profitMarginRate = parseFloat(document.getElementById('profitMarginRate').value) / 100;
+    const laborRate = parseFloat(document.getElementById('laborRate').value);
+    const productivity = parseFloat(document.getElementById('productivity').value);
+    const crewSize = parseFloat(document.getElementById('crewSize').value);
+    const workHours = parseFloat(document.getElementById('workHours').value);
     
-    // For demonstration, we'll call the original function
-    // In practice, you'd continue with the calculation here
-    console.log('Calculation would continue here...');
-    alert('Calculation started! Check console for details.');
-}
-
-// ============================================
-// ORIGINAL NEC CALCULATION FUNCTIONS
-// ============================================
-function calculateNECBoxFillForCircuit(circuitData) {
-    const conductorSize = circuitData.wireSize;
-    const currentConductors = safeNumber(circuitData.conductors);
-    const groundingConductors = 1;
-    const devicesCount = safeNumber(circuitData.devices);
-    const cableClamps = safeNumber(circuitData.clamps);
-    const pigtails = 2;
-    const safetyFactor = 0.20;
-
-    const conductorVolumes = { 
-        '14': 2.0, '12': 2.25, '10': 2.5, '8': 3.0, '6': 5.0 
-    };
-    const volPerConductor = conductorVolumes[conductorSize] || conductorVolumes['12'];
-
-    const currentVolume = (currentConductors + pigtails) * volPerConductor;
-    const groundVolume = volPerConductor;
-    const deviceVolume = devicesCount * 2 * volPerConductor;
-    const clampVolume = cableClamps * volPerConductor;
-
-    const totalVolumeRequired = currentVolume + groundVolume + deviceVolume + clampVolume;
-    const volumeWithSafety = totalVolumeRequired * (1 + safetyFactor);
-
-    const suitableBoxes = Object.entries(BOX_CAPACITIES)
-        .filter(([boxName, boxData]) => boxData.volume >= volumeWithSafety)
-        .sort((a, b) => a[1].volume - b[1].volume);
-
-    const smallestSuitableBox = suitableBoxes[0];
-    const isCompliant = smallestSuitableBox != undefined;
-
-    const necResult = {
-        conductorSize,
-        currentConductors,
-        pigtails,
-        groundingConductors,
-        devicesCount,
-        cableClamps,
-        volPerConductor,
-        currentVolume,
-        groundVolume,
-        deviceVolume,
-        clampVolume,
-        totalVolumeRequired,
-        volumeWithSafety,
-        safetyFactor: safetyFactor * 100,
-        requiredBoxVolume: volumeWithSafety,
-        smallestSuitableBox: smallestSuitableBox ? smallestSuitableBox[0] : null,
-        smallestSuitableBoxVolume: smallestSuitableBox ? smallestSuitableBox[1].volume : null,
-        isCompliant,
-        suitableBoxes
-    };
-
-    if (!necResult.smallestSuitableBox) {
-        necResult.smallestSuitableBox = 'CUSTOM BOX REQUIRED';
-        necResult.smallestSuitableBoxVolume = necResult.volumeWithSafety;
-        necResult.isCompliant = false;
-    }
-
-    return necResult;
-}
-
-function getNECCompliantBoxesForCircuit(necResult) {
-    if (!necResult) return {};
+    // Get indirect cost rates
+    const equipmentRate = parseFloat(document.getElementById('equipmentCost').value) / 100;
+    const transportationRate = parseFloat(document.getElementById('transportationCost').value) / 100;
+    const tempFacilitiesRate = parseFloat(document.getElementById('tempFacilitiesRate').value) / 100;
+    const powerConsumptionRate = parseFloat(document.getElementById('powerConsumptionRate').value) / 100;
+    const waterConsumptionRate = parseFloat(document.getElementById('waterConsumptionRate').value) / 100;
+    const permitsTaxesRate = parseFloat(document.getElementById('permitsTaxesRate').value) / 100;
+    const safetyServicesRate = parseFloat(document.getElementById('safetyServicesRate').value) / 100;
+    const bondsInsurancesRate = parseFloat(document.getElementById('bondsInsurancesRate').value) / 100;
+    const asBuiltPlansRate = parseFloat(document.getElementById('asBuiltPlansRate').value) / 100;
+    const deliveryHaulingRate = parseFloat(document.getElementById('deliveryHaulingRate').value) / 100;
+    const contingencyRate = parseFloat(document.getElementById('contingencyRate').value) / 100;
     
-    const requiredVolume = necResult.volumeWithSafety;
-    const boxUpgrades = {};
+    // Get box distribution percentages
+    const pctJunc = parseFloat(document.getElementById('pctJunc').value) / 100;
+    const pctUtil = parseFloat(document.getElementById('pctUtil').value) / 100;
+    const pctSq = parseFloat(document.getElementById('pctSq').value) / 100;
+    const pctPull = parseFloat(document.getElementById('pctPull').value) / 100;
+    const pctGutter = parseFloat(document.getElementById('pctGutter').value) / 100;
+    const pctWire4 = parseFloat(document.getElementById('pctWire4').value) / 100;
+    const pctWire6 = parseFloat(document.getElementById('pctWire6').value) / 100;
+    const pctWire8 = parseFloat(document.getElementById('pctWire8').value) / 100;
     
-    Object.entries(BOX_CAPACITIES).forEach(([boxName, boxData]) => {
-        if (boxData.volume < requiredVolume && BOX_TYPE_MAPPINGS[boxName]) {
-            const upgradedBox = BOX_TYPE_MAPPINGS[boxName];
-            const upgradedBoxData = BOX_CAPACITIES[upgradedBox];
-            
-            if (upgradedBoxData && upgradedBoxData.volume >= requiredVolume) {
-                boxUpgrades[boxName] = upgradedBox;
-            }
+    // Get base unit costs
+    const baseCostJunc = parseFloat(document.getElementById('costJunc').value);
+    const baseCostUtil = parseFloat(document.getElementById('costUtil').value);
+    const baseCostSq = parseFloat(document.getElementById('costSq').value);
+    const costPull = parseFloat(document.getElementById('costPull').value);
+    const costGutter = parseFloat(document.getElementById('costGutter').value);
+    const costNip = parseFloat(document.getElementById('costNip').value);
+    const costWire4 = parseFloat(document.getElementById('costWire4').value);
+    const costWire6 = parseFloat(document.getElementById('costWire6').value);
+    const costWire8 = parseFloat(document.getElementById('costWire8').value);
+    const costCover = parseFloat(document.getElementById('costCover').value);
+    
+    // Apply NEC-driven cost adjustments based on worst-case circuit
+    let costJunc = baseCostJunc;
+    let costUtil = baseCostUtil;
+    let costSq = baseCostSq;
+    
+    let necAdjustments = [];
+    let maxVolumeRequired = 0;
+    let worstCaseCircuit = null;
+    
+    circuitResults.forEach(circuit => {
+        if (circuit.necResult.volumeWithSafety > maxVolumeRequired) {
+            maxVolumeRequired = circuit.necResult.volumeWithSafety;
+            worstCaseCircuit = circuit;
         }
     });
     
-    return boxUpgrades;
+    // Apply upgrades based on worst-case circuit
+    if (worstCaseCircuit && worstCaseCircuit.boxUpgrades) {
+        const worstCaseUpgrades = worstCaseCircuit.boxUpgrades;
+        const BOX_CAPACITIES = AppState.get('BOX_CAPACITIES');
+        
+        if (worstCaseUpgrades['Utility Box (Standard)']) {
+            const upgradedBox = worstCaseUpgrades['Utility Box (Standard)'];
+            costUtil = baseCostUtil * BOX_CAPACITIES[upgradedBox].costMultiplier;
+            necAdjustments.push(`Utility boxes upgraded to ${upgradedBox} for ${worstCaseCircuit.description}`);
+        }
+        
+        if (worstCaseUpgrades['4x4 Junction Box (1.5")']) {
+            const upgradedBox = worstCaseUpgrades['4x4 Junction Box (1.5")'];
+            costJunc = baseCostJunc * BOX_CAPACITIES[upgradedBox].costMultiplier;
+            necAdjustments.push(`Junction boxes upgraded to ${upgradedBox} for ${worstCaseCircuit.description}`);
+        }
+        
+        if (worstCaseUpgrades['4x4 Square Box (1.5")']) {
+            const upgradedBox = worstCaseUpgrades['4x4 Square Box (1.5")'];
+            costSq = baseCostSq * BOX_CAPACITIES[upgradedBox].costMultiplier;
+            necAdjustments.push(`Square boxes upgraded to ${upgradedBox} for ${worstCaseCircuit.description}`);
+        }
+    }
+    
+    // Calculate quantities for each box type
+    const qtyJunc = Math.ceil(totalOutlets * pctJunc);
+    const qtyUtil = Math.ceil(totalOutlets * pctUtil);
+    const qtySq = Math.ceil(totalOutlets * pctSq);
+    const qtyPull = Math.ceil(totalOutlets * pctPull);
+    const qtyGutter = Math.ceil(totalOutlets * pctGutter);
+    const qtyWire4 = Math.ceil(totalOutlets * pctWire4);
+    const qtyWire6 = Math.ceil(totalOutlets * pctWire6);
+    const qtyWire8 = Math.ceil(totalOutlets * pctWire8);
+    const qtyNip = Math.ceil(totalOutlets * 0.8);
+    const qtyCover = Math.ceil(totalOutlets);
+    
+    // Calculate material costs with wastage
+    const materialCostJunc = qtyJunc * costJunc * (1 + wastage);
+    const materialCostUtil = qtyUtil * costUtil * (1 + wastage);
+    const materialCostSq = qtySq * costSq * (1 + wastage);
+    const materialCostPull = qtyPull * costPull * (1 + wastage);
+    const materialCostGutter = qtyGutter * costGutter * (1 + wastage);
+    const materialCostNip = qtyNip * costNip * (1 + wastage);
+    const materialCostWire4 = qtyWire4 * costWire4 * (1 + wastage);
+    const materialCostWire6 = qtyWire6 * costWire6 * (1 + wastage);
+    const materialCostWire8 = qtyWire8 * costWire8 * (1 + wastage);
+    const materialCostCover = qtyCover * costCover * (1 + wastage);
+    
+    // Calculate total material cost
+    totalMaterialCost = materialCostJunc + materialCostUtil + materialCostSq + materialCostPull + 
+                       materialCostGutter + materialCostNip + materialCostWire4 + materialCostWire6 + 
+                       materialCostWire8 + materialCostCover;
+    
+    // Calculate labor cost
+    const totalLaborHours = totalOutlets / (productivity * crewSize);
+    totalLaborCost = totalLaborHours * laborRate * crewSize;
+    
+    // Calculate DIRECT COST (Material + Labor)
+    const directCost = totalMaterialCost + totalLaborCost;
+    
+    // Calculate INDIRECT COSTS (all based on direct cost)
+    const equipmentCost = directCost * equipmentRate;
+    const transportationCost = directCost * transportationRate;
+    const tempFacilitiesCost = directCost * tempFacilitiesRate;
+    const powerConsumptionCost = directCost * powerConsumptionRate;
+    const waterConsumptionCost = directCost * waterConsumptionRate;
+    const permitsTaxesCost = directCost * permitsTaxesRate;
+    const safetyServicesCost = directCost * safetyServicesRate;
+    const bondsInsurancesCost = directCost * bondsInsurancesRate;
+    const asBuiltPlansCost = directCost * asBuiltPlansRate;
+    const deliveryHaulingCost = directCost * deliveryHaulingRate;
+    const contingencyCost = directCost * contingencyRate;
+    const overheadCost = directCost * overheadRate;
+    
+    // Calculate total indirect cost
+    const indirectCost = equipmentCost + transportationCost + tempFacilitiesCost + 
+                       powerConsumptionCost + waterConsumptionCost + permitsTaxesCost + 
+                       safetyServicesCost + bondsInsurancesCost + asBuiltPlansCost + 
+                       deliveryHaulingCost + contingencyCost + overheadCost;
+    
+    // Calculate GRAND TOTAL (Direct + Indirect)
+    const grandTotal = directCost + indirectCost;
+    
+    // Calculate PROFIT MARGIN (applied on Grand Total)
+    const profitCost = grandTotal * profitMarginRate;
+    
+    // Calculate PROJECTED BUDGET (Direct + Indirect + Profit)
+    const projectedBudget = grandTotal + profitCost;
+    
+    // Calculate cost per box
+    const costPerBox = projectedBudget / totalOutlets;
+    
+    // Get currency symbol
+    const currencySymbol = AppState.getCurrencySymbol();
+    
+    // Update Bill of Quantities table
+    updateBOQTable(circuitResults, totalOutlets, {
+        qtyJunc, qtyUtil, qtySq, qtyPull, qtyGutter, qtyNip, qtyWire4, qtyWire6, qtyWire8, qtyCover,
+        costJunc, costUtil, costSq, costPull, costGutter, costNip, costWire4, costWire6, costWire8, costCover,
+        productivity, laborRate, crewSize, wastage, 
+        materialCostJunc, materialCostUtil, materialCostSq,
+        materialCostPull, materialCostGutter, materialCostNip, materialCostWire4, materialCostWire6,
+        materialCostWire8, materialCostCover
+    }, worstCaseCircuit, currencySymbol);
+    
+    // Update Cost Breakdown
+    document.getElementById('materialCostDisplay').textContent = formatCurrency(totalMaterialCost, currencySymbol);
+    document.getElementById('laborCostDisplay').textContent = formatCurrency(totalLaborCost, currencySymbol);
+    document.getElementById('totalDirectCostDisplay').textContent = formatCurrency(directCost, currencySymbol);
+    
+    // Update Indirect Costs
+    document.getElementById('equipmentCostDisplay').textContent = formatCurrency(equipmentCost, currencySymbol);
+    document.getElementById('transportationCostDisplay').textContent = formatCurrency(transportationCost, currencySymbol);
+    document.getElementById('tempFacilitiesCostDisplay').textContent = formatCurrency(tempFacilitiesCost, currencySymbol);
+    document.getElementById('powerConsumptionCostDisplay').textContent = formatCurrency(powerConsumptionCost, currencySymbol);
+    document.getElementById('waterConsumptionCostDisplay').textContent = formatCurrency(waterConsumptionCost, currencySymbol);
+    document.getElementById('permitsTaxesCostDisplay').textContent = formatCurrency(permitsTaxesCost, currencySymbol);
+    document.getElementById('safetyServicesCostDisplay').textContent = formatCurrency(safetyServicesCost, currencySymbol);
+    document.getElementById('bondsInsurancesCostDisplay').textContent = formatCurrency(bondsInsurancesCost, currencySymbol);
+    document.getElementById('asBuiltPlansCostDisplay').textContent = formatCurrency(asBuiltPlansCost, currencySymbol);
+    document.getElementById('deliveryHaulingCostDisplay').textContent = formatCurrency(deliveryHaulingCost, currencySymbol);
+    document.getElementById('contingencyCostDisplay').textContent = formatCurrency(contingencyCost, currencySymbol);
+    document.getElementById('overheadCostDisplay').textContent = formatCurrency(overheadCost, currencySymbol);
+    document.getElementById('totalIndirectCostDisplay').textContent = formatCurrency(indirectCost, currencySymbol);
+    
+    // Update Grand Total
+    document.getElementById('grandTotalDisplay').textContent = formatCurrency(grandTotal, currencySymbol);
+    
+    // Update Profit Margin
+    document.getElementById('profitCostDisplay').textContent = formatCurrency(profitCost, currencySymbol);
+    
+    // Update Projected Budget
+    document.getElementById('projectedBudgetDisplay').textContent = formatCurrency(projectedBudget, currencySymbol);
+    document.querySelector('.currency-display').textContent = currencySymbol;
+    
+    // Update project summary
+    document.getElementById('totalBoxes').value = Math.round(totalOutlets) + ' boxes';
+    document.getElementById('totalLaborHours').value = totalLaborHours.toFixed(1) + ' hours';
+    document.getElementById('projectDuration').value = (totalLaborHours / workHours).toFixed(1) + ' days';
+    document.getElementById('costPerBox').value = formatCurrency(costPerBox, currencySymbol) + ' per box';
+    
+    // Update procurement table
+    updateProcurementTable({
+        qtyJunc, qtyUtil, qtySq, qtyPull, qtyGutter, qtyNip, qtyWire4, qtyWire6, qtyWire8, qtyCover,
+        materialCostJunc, materialCostUtil, materialCostSq, materialCostPull, materialCostGutter,
+        materialCostNip, materialCostWire4, materialCostWire6, materialCostWire8, materialCostCover,
+        totalMaterialCost
+    }, worstCaseCircuit, currencySymbol);
+    
+    // Update circuit results summary
+    updateCircuitResultsSummary(circuitResults, totalOutlets);
+    
+    // Update NEC compliance summary
+    checkNECCompliance(necAdjustments, circuitResults);
+    
+    // Store project data for export
+    const projectData = {
+        projectName: document.getElementById('projectName').value,
+        bidNumber: document.getElementById('bidNumber').value,
+        clientName: document.getElementById('clientName').value,
+        projectLocation: document.getElementById('projectLocation').value,
+        preparedBy: document.getElementById('preparedBy').value,
+        projectDate: document.getElementById('projectDate').value,
+        currency: document.getElementById('currency').value,
+        totals: {
+            totalMaterialCost,
+            totalLaborCost,
+            directCost,
+            indirectCost,
+            grandTotal,
+            profitCost,
+            projectedBudget,
+            costPerBox,
+            equipmentCost,
+            transportationCost,
+            tempFacilitiesCost,
+            powerConsumptionCost,
+            waterConsumptionCost,
+            permitsTaxesCost,
+            safetyServicesCost,
+            bondsInsurancesCost,
+            asBuiltPlansCost,
+            deliveryHaulingCost,
+            contingencyCost,
+            overheadCost
+        },
+        quantities: {
+            totalOutlets,
+            qtyJunc,
+            qtyUtil,
+            qtySq,
+            qtyPull,
+            qtyGutter,
+            qtyWire4,
+            qtyWire6,
+            qtyWire8,
+            qtyNip,
+            qtyCover
+        },
+        labor: {
+            totalLaborHours,
+            productivity,
+            crewSize,
+            laborRate,
+            workHours
+        },
+        rates: {
+            equipmentRate: equipmentRate * 100,
+            transportationRate: transportationRate * 100,
+            tempFacilitiesRate: tempFacilitiesRate * 100,
+            powerConsumptionRate: powerConsumptionRate * 100,
+            waterConsumptionRate: waterConsumptionRate * 100,
+            permitsTaxesRate: permitsTaxesRate * 100,
+            safetyServicesRate: safetyServicesRate * 100,
+            bondsInsurancesRate: bondsInsurancesRate * 100,
+            asBuiltPlansRate: asBuiltPlansRate * 100,
+            deliveryHaulingRate: deliveryHaulingRate * 100,
+            contingencyRate: contingencyRate * 100,
+            overheadRate: overheadRate * 100,
+            profitMarginRate: profitMarginRate * 100,
+            wastage: wastage * 100
+        },
+        circuits: circuitResults,
+        circuitNecResults,
+        necAdjustments
+    };
+
+    AppState.set('projectData', projectData);
+    AppState.set('circuitNecResults', circuitNecResults);
+
+    console.log('Calculation completed successfully');
+}
+
+// ============================================
+// UI UPDATE FUNCTIONS
+// ============================================
+function updateCircuitSummary(circuitResults, totalOutlets) {
+    const summaryElement = document.getElementById('circuitSummaryContent');
+    let summaryHTML = '<div class="circuit-totals">';
+    
+    circuitResults.forEach(circuit => {
+        summaryHTML += `
+            <div class="circuit-total-item">
+                <div style="font-weight: bold;">${circuit.description}</div>
+                <div>${circuit.wireSize} AWG</div>
+                <div>${(circuit.percentage * 100).toFixed(0)}% (${circuit.circuitBoxes} boxes)</div>
+            </div>
+        `;
+    });
+    
+    summaryHTML += `
+        <div class="circuit-total-item" style="background: #e8f5e8;">
+            <div style="font-weight: bold;">TOTAL</div>
+            <div>Multi-Wire</div>
+            <div>100% (${Math.round(totalOutlets)} boxes)</div>
+        </div>
+    </div>
+    `;
+    
+    summaryElement.innerHTML = summaryHTML;
+}
+
+function updateCircuitNecResults(circuitResults) {
+    const resultsElement = document.getElementById('circuitNecResults');
+    let resultsHTML = '';
+    
+    circuitResults.forEach(circuit => {
+        const nec = circuit.necResult;
+        const statusClass = nec.isCompliant ? 'nec-pass' : 'nec-fail';
+        const statusText = nec.isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT';
+        
+        resultsHTML += `
+            <div class="circuit-item">
+                <div class="circuit-header">
+                    <span class="circuit-title">${circuit.description}</span>
+                    <span class="circuit-wire-size">${circuit.wireSize} AWG</span>
+                </div>
+                <div class="nec-result ${statusClass}">
+                    ${statusText}: ${formatNumber(nec.volumeWithSafety, 2)} cu. in. required
+                    ${nec.smallestSuitableBox ? ` - Minimum: ${nec.smallestSuitableBox}` : ' - Custom box needed'}
+                </div>
+                <div class="nec-details">
+                    <p><strong>Calculation Details:</strong></p>
+                    <ul>
+                        <li>Conductors: ${circuit.conductors} current + 2 pigtails = ${(circuit.conductors + 2)} × ${formatNumber(nec.volPerConductor, 2)} cu. in.</li>
+                        <li>Devices: ${circuit.devices} × 2 × ${formatNumber(nec.volPerConductor, 2)} cu. in.</li>
+                        <li>Clamps: ${circuit.clamps} × ${formatNumber(nec.volPerConductor, 2)} cu. in.</li>
+                        <li>Ground: 1 × ${formatNumber(nec.volPerConductor, 2)} cu. in.</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsElement.innerHTML = resultsHTML;
+}
+
+function updateCircuitResultsSummary(circuitResults, totalOutlets) {
+    const summaryElement = document.getElementById('circuitResultsSummary');
+    let summaryHTML = '<div class="circuit-totals">';
+    
+    circuitResults.forEach(circuit => {
+        const nec = circuit.necResult;
+        const statusText = nec.isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT';
+        const statusColor = nec.isCompliant ? '#2e7d32' : '#c62828';
+        
+        summaryHTML += `
+            <div class="circuit-total-item">
+                <div style="font-weight: bold;">${circuit.description}</div>
+                <div>${circuit.wireSize} AWG</div>
+                <div>${circuit.circuitBoxes} boxes</div>
+                <div style="color: ${statusColor}; font-weight: bold;">${statusText}</div>
+            </div>
+        `;
+    });
+    
+    summaryHTML += `
+        <div class="circuit-total-item" style="background: #e8f5e8;">
+            <div style="font-weight: bold;">PROJECT TOTAL</div>
+            <div>Multi-Wire</div>
+            <div>${Math.round(totalOutlets)} boxes</div>
+            <div style="font-weight: bold;">OPTIMIZED</div>
+        </div>
+    </div>
+    `;
+    
+    summaryElement.innerHTML = summaryHTML;
+}
+
+function checkNECCompliance(necAdjustments = [], circuitResults = []) {
+    const summaryElement = document.getElementById('necComplianceSummary');
+    const warningElement = document.getElementById('necComplianceWarning');
+    
+    let summaryHTML = '<div class="nec-compliance-details">';
+    summaryHTML += '<p><strong>Multi-Wire NEC 314.16 Compliance Summary:</strong></p>';
+    
+    let hasComplianceIssue = false;
+    let allCompliant = true;
+    
+    circuitResults.forEach(circuit => {
+        const nec = circuit.necResult;
+        if (!nec.isCompliant) {
+            allCompliant = false;
+            hasComplianceIssue = true;
+        }
+        
+        summaryHTML += `
+            <div class="nec-compliance-subsection">
+                <p><strong>${circuit.description} (${circuit.wireSize} AWG):</strong></p>
+                <ul>
+                    <li>Required Volume: ${formatNumber(nec.volumeWithSafety, 2)} cu. in.</li>
+                    <li>Status: <span style="color: ${nec.isCompliant ? '#2e7d32' : '#c62828'}">${nec.isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT'}</span></li>
+                    <li>Minimum Box: ${nec.smallestSuitableBox || 'Custom box required'}</li>
+                </ul>
+            </div>
+        `;
+    });
+    
+    if (necAdjustments.length > 0) {
+        summaryHTML += '<div class="nec-compliance-subsection">';
+        summaryHTML += '<p><strong>Automatic Adjustments Applied:</strong></p>';
+        summaryHTML += '<ul>';
+        necAdjustments.forEach(adjustment => {
+            summaryHTML += `<li>${adjustment}</li>`;
+        });
+        summaryHTML += '</ul>';
+        summaryHTML += '</div>';
+    }
+    
+    summaryHTML += `<div class="nec-compliance-subsection">
+        <p><strong>Overall Project Status:</strong> <span style="color: ${allCompliant ? '#2e7d32' : '#c62828'}">${allCompliant ? 'FULLY COMPLIANT' : 'REVIEW REQUIRED'}</span></p>
+    </div>`;
+    summaryHTML += '</div>';
+    
+    summaryElement.innerHTML = summaryHTML;
+    
+    if (hasComplianceIssue) {
+        warningElement.classList.remove('hidden');
+    } else {
+        warningElement.classList.add('hidden');
+    }
+}
+
+function updateBOQTable(circuitResults, totalOutlets, data, worstCaseCircuit, currencySymbol) {
+    const boqTable = document.getElementById('billOfQuantity');
+    
+    // Determine box descriptions based on NEC upgrades
+    const BOX_CAPACITIES = AppState.get('BOX_CAPACITIES');
+    const juncDescription = worstCaseCircuit && worstCaseCircuit.boxUpgrades && worstCaseCircuit.boxUpgrades['4x4 Junction Box (1.5")'] ? 
+        BOX_CAPACITIES[worstCaseCircuit.boxUpgrades['4x4 Junction Box (1.5")']].description : '4x4" Junction Box';
+    const utilDescription = worstCaseCircuit && worstCaseCircuit.boxUpgrades && worstCaseCircuit.boxUpgrades['Utility Box (Standard)'] ? 
+        BOX_CAPACITIES[worstCaseCircuit.boxUpgrades['Utility Box (Standard)']].description : 'Standard Utility Box';
+    const sqDescription = worstCaseCircuit && worstCaseCircuit.boxUpgrades && worstCaseCircuit.boxUpgrades['4x4 Square Box (1.5")'] ? 
+        BOX_CAPACITIES[worstCaseCircuit.boxUpgrades['4x4 Square Box (1.5")']].description : '4x4" Square Box';
+    
+    // Labor cost per item
+    const laborCostPerItem = (quantity) => {
+        return (quantity / data.productivity) * data.laborRate * data.crewSize;
+    };
+    
+    const laborCostJunc = laborCostPerItem(data.qtyJunc);
+    const laborCostUtil = laborCostPerItem(data.qtyUtil);
+    const laborCostSq = laborCostPerItem(data.qtySq);
+    const laborCostPull = laborCostPerItem(data.qtyPull);
+    const laborCostGutter = laborCostPerItem(data.qtyGutter);
+    const laborCostNip = laborCostPerItem(data.qtyNip);
+    const laborCostWire4 = laborCostPerItem(data.qtyWire4);
+    const laborCostWire6 = laborCostPerItem(data.qtyWire6);
+    const laborCostWire8 = laborCostPerItem(data.qtyWire8);
+    const laborCostCover = laborCostPerItem(data.qtyCover);
+    
+    const totalMaterialCost = data.materialCostJunc + data.materialCostUtil + data.materialCostSq + data.materialCostPull + 
+                            data.materialCostGutter + data.materialCostNip + data.materialCostWire4 + data.materialCostWire6 + 
+                            data.materialCostWire8 + data.materialCostCover;
+    
+    const totalLaborCost = laborCostJunc + laborCostUtil + laborCostSq + laborCostPull + 
+                         laborCostGutter + laborCostNip + laborCostWire4 + laborCostWire6 + 
+                         laborCostWire8 + laborCostCover;
+    
+    boqTable.innerHTML = `
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Unit Cost</th>
+                <th>Material Cost</th>
+                <th>Labor Cost</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Junction Box</td>
+                <td>${juncDescription}</td>
+                <td>${data.qtyJunc}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costJunc, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostJunc, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostJunc, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostJunc + laborCostJunc, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Utility Box</td>
+                <td>${utilDescription}</td>
+                <td>${data.qtyUtil}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costUtil, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostUtil, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostUtil, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostUtil + laborCostUtil, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Square Box</td>
+                <td>${sqDescription}</td>
+                <td>${data.qtySq}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costSq, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostSq, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostSq, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostSq + laborCostSq, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Pull Box</td>
+                <td>8x8" Pull Box</td>
+                <td>${data.qtyPull}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costPull, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostPull, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostPull, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostPull + laborCostPull, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Gutter</td>
+                <td>Wire Gutter</td>
+                <td>${data.qtyGutter}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costGutter, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostGutter, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostGutter, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostGutter + laborCostGutter, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Closed Nipple</td>
+                <td>1/2" Closed Nipple</td>
+                <td>${data.qtyNip}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costNip, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostNip, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostNip, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostNip + laborCostNip, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Wireway 4x4</td>
+                <td>4x4" Wireway</td>
+                <td>${data.qtyWire4}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costWire4, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire4, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostWire4, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire4 + laborCostWire4, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Wireway 6x6</td>
+                <td>6x6" Wireway</td>
+                <td>${data.qtyWire6}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costWire6, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire6, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostWire6, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire6 + laborCostWire6, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Wireway 8x8</td>
+                <td>8x8" Wireway</td>
+                <td>${data.qtyWire8}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costWire8, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire8, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostWire8, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire8 + laborCostWire8, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Covers</td>
+                <td>Blank Covers</td>
+                <td>${data.qtyCover}</td>
+                <td>pc</td>
+                <td class="text-right">${formatCurrency(data.costCover, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostCover, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(laborCostCover, currencySymbol)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostCover + laborCostCover, currencySymbol)}</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="5">TOTAL DIRECT COST</td>
+                <td id="totalMaterialCost" class="text-right">${formatCurrency(totalMaterialCost, currencySymbol)}</td>
+                <td id="totalLaborCost" class="text-right">${formatCurrency(totalLaborCost, currencySymbol)}</td>
+                <td id="totalCostColumn" class="text-right">${formatCurrency(totalMaterialCost + totalLaborCost, currencySymbol)}</td>
+            </tr>
+        </tfoot>
+    `;
+}
+
+function updateProcurementTable(data, worstCaseCircuit, currencySymbol) {
+    const procurementTable = document.getElementById('procurementTable');
+    
+    const BOX_CAPACITIES = AppState.get('BOX_CAPACITIES');
+    const juncDescription = worstCaseCircuit && worstCaseCircuit.boxUpgrades && worstCaseCircuit.boxUpgrades['4x4 Junction Box (1.5")'] ? 
+        BOX_CAPACITIES[worstCaseCircuit.boxUpgrades['4x4 Junction Box (1.5")']].description : '4x4" Junction Box';
+    const utilDescription = worstCaseCircuit && worstCaseCircuit.boxUpgrades && worstCaseCircuit.boxUpgrades['Utility Box (Standard)'] ? 
+        BOX_CAPACITIES[worstCaseCircuit.boxUpgrades['Utility Box (Standard)']].description : 'Standard Utility Box';
+    const sqDescription = worstCaseCircuit && worstCaseCircuit.boxUpgrades && worstCaseCircuit.boxUpgrades['4x4 Square Box (1.5")'] ? 
+        BOX_CAPACITIES[worstCaseCircuit.boxUpgrades['4x4 Square Box (1.5")']].description : '4x4" Square Box';
+    
+    procurementTable.innerHTML = `
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Qty Needed</th>
+                <th>Packaging</th>
+                <th>Units to Order</th>
+                <th>Cost</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>${juncDescription}</td>
+                <td>${data.qtyJunc}</td>
+                <td>Carton of 10</td>
+                <td>${Math.ceil(data.qtyJunc / 10)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostJunc, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>${utilDescription}</td>
+                <td>${data.qtyUtil}</td>
+                <td>Carton of 10</td>
+                <td>${Math.ceil(data.qtyUtil / 10)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostUtil, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>${sqDescription}</td>
+                <td>${data.qtySq}</td>
+                <td>Carton of 10</td>
+                <td>${Math.ceil(data.qtySq / 10)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostSq, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Pull Box</td>
+                <td>${data.qtyPull}</td>
+                <td>Individual</td>
+                <td>${data.qtyPull}</td>
+                <td class="text-right">${formatCurrency(data.materialCostPull, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Gutter</td>
+                <td>${data.qtyGutter}</td>
+                <td>Individual</td>
+                <td>${data.qtyGutter}</td>
+                <td class="text-right">${formatCurrency(data.materialCostGutter, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Closed Nipple</td>
+                <td>${data.qtyNip}</td>
+                <td>Box of 100</td>
+                <td>${Math.ceil(data.qtyNip / 100)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostNip, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Wireway 4x4</td>
+                <td>${data.qtyWire4}</td>
+                <td>Individual</td>
+                <td>${data.qtyWire4}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire4, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Wireway 6x6</td>
+                <td>${data.qtyWire6}</td>
+                <td>Individual</td>
+                <td>${data.qtyWire6}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire6, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Wireway 8x8</td>
+                <td>${data.qtyWire8}</td>
+                <td>Individual</td>
+                <td>${data.qtyWire8}</td>
+                <td class="text-right">${formatCurrency(data.materialCostWire8, currencySymbol)}</td>
+            </tr>
+            <tr>
+                <td>Covers</td>
+                <td>${data.qtyCover}</td>
+                <td>Carton of 25</td>
+                <td>${Math.ceil(data.qtyCover / 25)}</td>
+                <td class="text-right">${formatCurrency(data.materialCostCover, currencySymbol)}</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="4">TOTAL PROCUREMENT COST</td>
+                <td id="totalProcurementCost" class="text-right">${formatCurrency(data.totalMaterialCost, currencySymbol)}</td>
+            </tr>
+        </tfoot>
+    `;
 }
 
 // ============================================
@@ -2898,11 +3619,135 @@ function resetCalculator() {
         document.getElementById('pctWire6').value = '2';
         document.getElementById('pctWire8').value = '2';
         
+        // Reset costs
+        document.getElementById('costJunc').value = '150';
+        document.getElementById('costUtil').value = '120';
+        document.getElementById('costSq').value = '140';
+        document.getElementById('costPull').value = '450';
+        document.getElementById('costGutter').value = '320';
+        document.getElementById('costNip').value = '25';
+        document.getElementById('costWire4').value = '280';
+        document.getElementById('costWire6').value = '380';
+        document.getElementById('costWire8').value = '520';
+        document.getElementById('costCover').value = '35';
+        
+        // Reset labor
+        document.getElementById('laborRate').value = '250';
+        document.getElementById('productivity').value = '2.5';
+        document.getElementById('crewSize').value = '3';
+        document.getElementById('workHours').value = '8';
+        
         // Reset circuits
         document.getElementById('circuitsContainer').innerHTML = '';
         
+        // Reset results tables
+        document.getElementById('billOfQuantity').innerHTML = `
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Unit Cost</th>
+                    <th>Material Cost</th>
+                    <th>Labor Cost</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="8" class="text-center">No data calculated yet. Click "Calculate" to generate estimate.</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="5">TOTAL</td>
+                    <td id="totalMaterialCost" class="text-right">-</td>
+                    <td id="totalLaborCost" class="text-right">-</td>
+                    <td id="totalCostColumn" class="text-right">-</td>
+                </tr>
+            </tfoot>
+        `;
+        
+        document.getElementById('procurementTable').innerHTML = `
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty Needed</th>
+                    <th>Packaging</th>
+                    <th>Units to Order</th>
+                    <th>Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" class="text-center">No data calculated yet. Click "Calculate" to generate estimate.</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="4">TOTAL PROCUREMENT COST</td>
+                    <td id="totalProcurementCost" class="text-right">-</td>
+                </tr>
+            </tfoot>
+        `;
+        
+        // Reset Cost Breakdown
+        document.getElementById('materialCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('laborCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('totalDirectCostDisplay').textContent = 'PHP 0.00';
+        
+        document.getElementById('equipmentCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('transportationCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('tempFacilitiesCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('powerConsumptionCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('waterConsumptionCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('permitsTaxesCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('safetyServicesCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('bondsInsurancesCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('asBuiltPlansCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('deliveryHaulingCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('contingencyCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('overheadCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('totalIndirectCostDisplay').textContent = 'PHP 0.00';
+        
+        document.getElementById('grandTotalDisplay').textContent = 'PHP 0.00';
+        document.getElementById('profitCostDisplay').textContent = 'PHP 0.00';
+        document.getElementById('projectedBudgetDisplay').textContent = 'PHP 0.00';
+        document.querySelector('.currency-display').textContent = 'PHP';
+        
+        // Reset project summary
+        document.getElementById('totalBoxes').value = '';
+        document.getElementById('totalLaborHours').value = '';
+        document.getElementById('projectDuration').value = '';
+        document.getElementById('costPerBox').value = '';
+        
+        // Reset circuit summaries
+        document.getElementById('circuitSummaryContent').innerHTML = '<p>No circuits defined yet. Add circuits in the Circuit Types tab.</p>';
+        document.getElementById('circuitNecResults').innerHTML = '<p>NEC compliance calculations will appear here after circuits are defined and calculated.</p>';
+        document.getElementById('circuitResultsSummary').innerHTML = '<p>Circuit breakdown will appear here after calculation.</p>';
+        
+        // Reset NEC compliance
+        document.getElementById('necComplianceSummary').innerHTML = '<p>NEC compliance details will appear here after calculation.</p>';
+        document.getElementById('necComplianceWarning').classList.add('hidden');
+        
         // Reset dashboard
-        AppState.updateDashboard({});
+        document.getElementById('dashboardTotalBoxes').textContent = '0 boxes';
+        document.getElementById('dashboardNecStatus').textContent = 'Not calculated';
+        document.getElementById('dashboardBudget').textContent = 'PHP 0.00';
+        document.getElementById('dashboardDuration').textContent = '0 days';
+        
+        // Clear validation errors
+        document.querySelectorAll('.error-message').forEach(el => {
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('.input-error').forEach(el => {
+            el.classList.remove('input-error');
+        });
+        
+        // Reset project data
+        AppState.set('projectData', {});
+        AppState.set('circuitNecResults', {});
         
         // Add default circuit
         addCircuit();
@@ -2918,18 +3763,607 @@ function resetCalculator() {
 }
 
 // ============================================
-// EXPORT FUNCTIONS (simplified for brevity)
+// EXPORT FUNCTIONS
 // ============================================
+function formatNumberForPDF(num, decimals = 2) {
+    if (typeof num !== 'number' || isNaN(num)) return '0';
+    return num.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+function formatCurrencyForPDF(n) {
+    if (typeof n !== 'number' || isNaN(n)) return '0.00';
+    const prefix = AppState.getCurrencySymbol();
+    return prefix + ' ' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function exportToPDF() {
-    // Your existing PDF export function
-    console.log('PDF export would run here');
-    alert('PDF export would run (check original code for full implementation)');
+    const projectData = AppState.get('projectData');
+    if (!projectData.totals) {
+        alert('No results to export. Please calculate an estimate first.');
+        return;
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        // Reserved areas
+        const HEADER_H = 65;
+        const FOOTER_H = 30;
+        const CONTENT_MARGIN_L = 35;
+        const CONTENT_MARGIN_R = 35;
+
+        // Common styles
+        const BRAND = { r: 44, g: 62, b: 80 };
+        doc.setFont('helvetica', 'normal');
+
+        // Header/Footer drawer
+        function drawHeaderFooter(data) {
+            // Header bar
+            doc.setFillColor(240, 240, 240);
+            doc.rect(0, 0, pageWidth, HEADER_H, 'F');
+
+            // Title
+            doc.setFont('helvetica', 'bold'); 
+            doc.setFontSize(13);
+            doc.setTextColor(BRAND.r, BRAND.g, BRAND.b);
+            doc.text('PROFESSIONAL ELECTRICAL BOXES & COVERS ESTIMATE', pageWidth / 2, 24, { align: 'center' });
+
+            // Meta
+            doc.setFont('helvetica', 'normal'); 
+            doc.setFontSize(8); 
+            doc.setTextColor(0);
+
+            const projectName = document.getElementById('projectName').value || 'Unnamed Project';
+            const clientName = document.getElementById('clientName').value || 'Not specified';
+            const preparedBy = document.getElementById('preparedBy').value || 'Not specified';
+            const bidNumber = document.getElementById('bidNumber').value || 'Not specified';
+            const dateStr = document.getElementById('projectDate').value || '';
+
+            doc.text(`Project: ${projectName}`, CONTENT_MARGIN_L, 40);
+            doc.text(`Client: ${clientName}`, CONTENT_MARGIN_L, 52);
+            doc.text(`Bid Number: ${bidNumber}`, pageWidth - CONTENT_MARGIN_R, 40, { align: 'right' });
+            doc.text(`Prepared By: ${preparedBy}`, pageWidth - CONTENT_MARGIN_R, 52, { align: 'right' });
+
+            // Header rule
+            doc.setDrawColor(BRAND.r, BRAND.g, BRAND.b); 
+            doc.setLineWidth(0.5);
+            doc.line(CONTENT_MARGIN_L, HEADER_H - 6, pageWidth - CONTENT_MARGIN_R, HEADER_H - 6);
+
+            // Footer
+            const pageNumber = doc.internal.getNumberOfPages();
+            doc.setFontSize(8); 
+            doc.setTextColor(100);
+            doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 12, { align: 'center' });
+            doc.text(`Generated: ${new Date().toLocaleDateString()}`, CONTENT_MARGIN_L, pageHeight - 12);
+            doc.text(`Multi-Wire NEC 2023 Compliant`, pageWidth - CONTENT_MARGIN_R, pageHeight - 12, { align: 'right' });
+        }
+
+        // Common AutoTable options
+        const TABLE_OPTS = {
+            margin: { 
+                left: CONTENT_MARGIN_L, 
+                right: CONTENT_MARGIN_R, 
+                top: HEADER_H + 6, 
+                bottom: FOOTER_H + 6 
+            },
+            styles: {
+                font: 'helvetica',
+                fontSize: 7,
+                cellPadding: 3,
+                lineWidth: 0.25,
+                lineColor: 100,
+                overflow: 'linebreak',
+                valign: 'middle'
+            },
+            headStyles: {
+                fillColor: [BRAND.r, BRAND.g, BRAND.b],
+                textColor: 255,
+                fontStyle: 'bold',
+                fontSize: 7
+            },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+            didDrawPage: drawHeaderFooter,
+            tableWidth: 'auto'
+        };
+
+        // Section helper
+        function sectionTitle(text) {
+            doc.setFont('helvetica', 'bold'); 
+            doc.setFontSize(10);
+            doc.setTextColor(BRAND.r, BRAND.g, BRAND.b);
+            const y = (doc.lastAutoTable?.finalY || (HEADER_H + 12)) + 12;
+            doc.text(text, CONTENT_MARGIN_L, y);
+            return y + 4;
+        }
+
+        // Calculate available width
+        const availableWidth = pageWidth - CONTENT_MARGIN_L - CONTENT_MARGIN_R;
+
+        // ==== Circuit Summary ====
+        let startY = sectionTitle('CIRCUIT SUMMARY');
+        
+        const circuitHead = [
+            ['Circuit Type', 'Wire Size', 'Percentage', 'Boxes', 'NEC Status']
+        ];
+        
+        const circuitBody = [];
+        let totalBoxes = 0;
+
+        if (projectData.circuits && projectData.circuits.length > 0) {
+            projectData.circuits.forEach(circuit => {
+                const nec = circuit.necResult;
+                const status = nec.isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT';
+                circuitBody.push([
+                    circuit.description,
+                    circuit.wireSize + ' AWG',
+                    (circuit.percentage * 100).toFixed(0) + '%',
+                    circuit.circuitBoxes.toString(),
+                    status
+                ]);
+                totalBoxes += circuit.circuitBoxes;
+            });
+
+            // Add total row
+            circuitBody.push([
+                'TOTAL',
+                'Multi-Wire',
+                '100%',
+                totalBoxes.toString(),
+                'OPTIMIZED'
+            ]);
+
+            // Column widths
+            const circuitColumnStyles = {
+                0: { cellWidth: availableWidth * 0.35 },
+                1: { cellWidth: availableWidth * 0.15 },
+                2: { cellWidth: availableWidth * 0.15 },
+                3: { cellWidth: availableWidth * 0.15 },
+                4: { cellWidth: availableWidth * 0.20 }
+            };
+
+            doc.autoTable({
+                ...TABLE_OPTS,
+                startY: startY,
+                head: circuitHead,
+                body: circuitBody,
+                columnStyles: circuitColumnStyles,
+                didParseCell: function(data) {
+                    // Style the total row
+                    if (data.section === 'body' && data.row.index === circuitBody.length - 1) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [220, 240, 220];
+                    }
+                    // Color code NEC status
+                    if (data.column.index === 4) {
+                        if (data.cell.raw === 'COMPLIANT') {
+                            data.cell.styles.textColor = [46, 125, 50];
+                        } else if (data.cell.raw === 'NON-COMPLIANT') {
+                            data.cell.styles.textColor = [198, 40, 40];
+                        } else if (data.cell.raw === 'OPTIMIZED') {
+                            data.cell.styles.textColor = [30, 136, 229];
+                        }
+                    }
+                }
+            });
+        }
+
+        // ==== Bill of Quantity ====
+        startY = sectionTitle('BILL OF QUANTITY');
+        
+        const boqHead = [
+            ['Item', 'Description', 'Qty', 'Unit', 'Unit Cost', 'Material Cost', 'Labor Cost', 'Total']
+        ];
+        
+        const boqBody = [];
+        
+        // Get data from the current table
+        const boqTable = document.getElementById('billOfQuantity');
+        const rows = boqTable.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 8) {
+                const rowData = [
+                    cells[0].textContent.trim(),
+                    cells[1].textContent.trim(),
+                    cells[2].textContent.trim(),
+                    cells[3].textContent.trim(),
+                    cells[4].textContent.trim(),
+                    cells[5].textContent.trim(),
+                    cells[6].textContent.trim(),
+                    cells[7].textContent.trim()
+                ];
+                boqBody.push(rowData);
+            }
+        });
+
+        // Add total direct cost row
+        boqBody.push([
+            'TOTAL DIRECT COST',
+            '',
+            '',
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.totalMaterialCost),
+            formatCurrencyForPDF(projectData.totals.totalLaborCost),
+            formatCurrencyForPDF(projectData.totals.directCost)
+        ]);
+
+        // Column widths
+        const boqColumnStyles = {
+            0: { cellWidth: availableWidth * 0.10 },
+            1: { cellWidth: availableWidth * 0.22 },
+            2: { cellWidth: availableWidth * 0.07 },
+            3: { cellWidth: availableWidth * 0.07 },
+            4: { cellWidth: availableWidth * 0.10 },
+            5: { cellWidth: availableWidth * 0.13 },
+            6: { cellWidth: availableWidth * 0.13 },
+            7: { cellWidth: availableWidth * 0.18 }
+        };
+
+        doc.autoTable({
+            ...TABLE_OPTS,
+            startY: startY,
+            head: boqHead,
+            body: boqBody,
+            columnStyles: boqColumnStyles,
+            didParseCell: function(data) {
+                // Bold and style the total direct cost row
+                if (data.section === 'body' && data.row.index === boqBody.length - 1) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.fillColor = [240, 240, 240];
+                    data.cell.styles.textColor = [BRAND.r, BRAND.g, BRAND.b];
+                }
+                // Right align numeric columns
+                if (data.column.index >= 4) {
+                    data.cell.styles.halign = 'right';
+                }
+                if (data.column.index === 2) {
+                    data.cell.styles.halign = 'right';
+                }
+            }
+        });
+
+        // ==== COMPLETE COST BREAKDOWN ====
+        startY = sectionTitle('COMPLETE COST BREAKDOWN');
+        
+        const costData = [
+            ['DIRECT COSTS', formatCurrencyForPDF(projectData.totals.directCost)],
+            ['', ''],
+            ['  Material Cost', formatCurrencyForPDF(projectData.totals.totalMaterialCost)],
+            ['  Labor Cost', formatCurrencyForPDF(projectData.totals.totalLaborCost)],
+            ['', ''],
+            ['INDIRECT COSTS', formatCurrencyForPDF(projectData.totals.indirectCost)],
+            ['', ''],
+            ['  Equipment Cost', formatCurrencyForPDF(projectData.totals.equipmentCost) + ` (${projectData.rates.equipmentRate}%)`],
+            ['  Transportation Cost', formatCurrencyForPDF(projectData.totals.transportationCost) + ` (${projectData.rates.transportationRate}%)`],
+            ['  Temporary Facilities', formatCurrencyForPDF(projectData.totals.tempFacilitiesCost) + ` (${projectData.rates.tempFacilitiesRate}%)`],
+            ['  Power Consumption', formatCurrencyForPDF(projectData.totals.powerConsumptionCost) + ` (${projectData.rates.powerConsumptionRate}%)`],
+            ['  Water Consumption', formatCurrencyForPDF(projectData.totals.waterConsumptionCost) + ` (${projectData.rates.waterConsumptionRate}%)`],
+            ['  Permits & Taxes', formatCurrencyForPDF(projectData.totals.permitsTaxesCost) + ` (${projectData.rates.permitsTaxesRate}%)`],
+            ['  Safety/Sanitation/Security', formatCurrencyForPDF(projectData.totals.safetyServicesCost) + ` (${projectData.rates.safetyServicesRate}%)`],
+            ['  Bonds & Insurances', formatCurrencyForPDF(projectData.totals.bondsInsurancesCost) + ` (${projectData.rates.bondsInsurancesRate}%)`],
+            ['  As-Built Plans', formatCurrencyForPDF(projectData.totals.asBuiltPlansCost) + ` (${projectData.rates.asBuiltPlansRate}%)`],
+            ['  Delivery & Hauling Charges', formatCurrencyForPDF(projectData.totals.deliveryHaulingCost) + ` (${projectData.rates.deliveryHaulingRate}%)`],
+            ['  Contingency Cost', formatCurrencyForPDF(projectData.totals.contingencyCost) + ` (${projectData.rates.contingencyRate}%)`],
+            ['  Overhead Rate', formatCurrencyForPDF(projectData.totals.overheadCost) + ` (${projectData.rates.overheadRate}%)`],
+            ['', ''],
+            ['GRAND TOTAL (Direct + Indirect)', formatCurrencyForPDF(projectData.totals.grandTotal)],
+            ['', ''],
+            ['PROFIT MARGIN', formatCurrencyForPDF(projectData.totals.profitCost) + ` (${projectData.rates.profitMarginRate}%)`],
+            ['', ''],
+            ['PROJECTED BUDGET', formatCurrencyForPDF(projectData.totals.projectedBudget)]
+        ];
+
+        // Column widths
+        const costColumnStyles = {
+            0: { cellWidth: availableWidth * 0.6 },
+            1: { cellWidth: availableWidth * 0.4, halign: 'right' }
+        };
+
+        doc.autoTable({
+            ...TABLE_OPTS,
+            startY: startY,
+            head: [['Category', 'Amount']],
+            body: costData,
+            columnStyles: costColumnStyles,
+            didParseCell: function(data) {
+                if (data.section === 'body') {
+                    // Style section headers
+                    if (data.cell.raw === 'DIRECT COSTS' || data.cell.raw === 'INDIRECT COSTS' || 
+                        data.cell.raw === 'GRAND TOTAL (Direct + Indirect)' || 
+                        data.cell.raw === 'PROFIT MARGIN' || data.cell.raw === 'PROJECTED BUDGET') {
+                        data.cell.styles.fillColor = [240, 240, 240];
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.textColor = [BRAND.r, BRAND.g, BRAND.b];
+                    }
+                    
+                    // Style the projected budget row
+                    if (data.cell.raw === 'PROJECTED BUDGET') {
+                        data.cell.styles.fillColor = [220, 240, 220];
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.textColor = [BRAND.r, BRAND.g, BRAND.b];
+                    }
+                    
+                    // Indent sub-items
+                    if (data.cell.raw.startsWith('  ')) {
+                        data.cell.styles.fontStyle = 'normal';
+                        data.cell.styles.textColor = [100, 100, 100];
+                    }
+                    
+                    // Empty rows for spacing
+                    if (data.cell.raw === '') {
+                        data.cell.styles.fontSize = 4;
+                    }
+                }
+            }
+        });
+
+        // ==== Project Summary ====
+        startY = sectionTitle('PROJECT SUMMARY');
+        
+        const summaryData = [
+            ['Total Boxes', Math.round(projectData.quantities.totalOutlets) + ' boxes'],
+            ['Total Labor Hours', formatNumberForPDF(projectData.labor.totalLaborHours, 1) + ' hours'],
+            ['Project Duration', formatNumberForPDF(projectData.labor.totalLaborHours / projectData.labor.workHours, 1) + ' days'],
+            ['Cost per Box', formatCurrencyForPDF(projectData.totals.costPerBox)],
+            ['Crew Size', projectData.labor.crewSize + ' workers'],
+            ['Productivity', projectData.labor.productivity + ' boxes/hour/worker'],
+            ['Labor Rate', formatCurrencyForPDF(projectData.labor.laborRate) + '/hour'],
+            ['Wastage', projectData.rates.wastage + '%']
+        ];
+
+        // Column widths
+        const summaryColumnStyles = {
+            0: { cellWidth: availableWidth * 0.5 },
+            1: { cellWidth: availableWidth * 0.5, halign: 'right' }
+        };
+
+        doc.autoTable({
+            ...TABLE_OPTS,
+            startY: startY,
+            head: [['Parameter', 'Value']],
+            body: summaryData,
+            columnStyles: summaryColumnStyles
+        });
+
+        // ==== NEC Compliance Details ====
+        if (projectData.circuits && projectData.circuits.length > 0) {
+            startY = sectionTitle('MULTI-WIRE NEC 314.16 COMPLIANCE DETAILS');
+            
+            // Find the worst-case circuit
+            let worstCaseCircuit = null;
+            let maxVolumeRequired = 0;
+            
+            projectData.circuits.forEach(circuit => {
+                if (circuit.necResult.volumeWithSafety > maxVolumeRequired) {
+                    maxVolumeRequired = circuit.necResult.volumeWithSafety;
+                    worstCaseCircuit = circuit;
+                }
+            });
+
+            if (worstCaseCircuit) {
+                const nec = worstCaseCircuit.necResult;
+                const necData = [
+                    ['Worst-Case Circuit', worstCaseCircuit.description + ' (' + worstCaseCircuit.wireSize + ' AWG)'],
+                    ['Conductor Size', worstCaseCircuit.wireSize + ' AWG'],
+                    ['Current Conductors', worstCaseCircuit.conductors],
+                    ['Pigtails', nec.pigtails],
+                    ['Grounding Conductors', nec.groundingConductors],
+                    ['Devices', worstCaseCircuit.devices],
+                    ['Cable Clamps', worstCaseCircuit.clamps],
+                    ['Volume per Conductor', formatNumberForPDF(nec.volPerConductor, 2) + ' cu. in.'],
+                    ['Total Volume Required', formatNumberForPDF(nec.totalVolumeRequired, 2) + ' cu. in.'],
+                    ['Safety Factor', nec.safetyFactor + '%'],
+                    ['Volume with Safety', formatNumberForPDF(nec.volumeWithSafety, 2) + ' cu. in.'],
+                    ['Minimum Required Box', nec.smallestSuitableBox || 'Custom box required'],
+                    ['Compliance Status', nec.isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT']
+                ];
+
+                // Add NEC adjustments if any
+                if (projectData.necAdjustments && projectData.necAdjustments.length > 0) {
+                    necData.push(['', '']);
+                    necData.push(['NEC-Driven Adjustments:', '']);
+                    projectData.necAdjustments.forEach(adjustment => {
+                        necData.push(['', adjustment]);
+                    });
+                }
+
+                // Column widths
+                const necColumnStyles = {
+                    0: { cellWidth: availableWidth * 0.6, fontStyle: 'bold' },
+                    1: { cellWidth: availableWidth * 0.4 }
+                };
+
+                doc.autoTable({
+                    ...TABLE_OPTS,
+                    startY: startY,
+                    head: [['Parameter', 'Value']],
+                    body: necData,
+                    columnStyles: necColumnStyles,
+                    didParseCell: function(data) {
+                        if (data.section === 'body') {
+                            // Highlight compliance status
+                            if (data.cell.raw === 'COMPLIANT') {
+                                data.cell.styles.textColor = [46, 125, 50];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (data.cell.raw === 'NON-COMPLIANT') {
+                                data.cell.styles.textColor = [198, 40, 40];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                            
+                            // Style adjustments section
+                            if (data.row.raw[0] === 'NEC-Driven Adjustments:') {
+                                data.cell.styles.fontStyle = 'bold';
+                                data.cell.styles.fillColor = [255, 243, 224];
+                            } else if (data.row.raw[0] === '' && data.column.index === 1 && data.row.index > 12) {
+                                data.cell.styles.fontStyle = 'italic';
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // ==== Procurement Summary ====
+        startY = sectionTitle('PROCUREMENT SUMMARY');
+        
+        const procurementData = [];
+        const procurementTable = document.getElementById('procurementTable');
+        const procurementRows = procurementTable.querySelectorAll('tbody tr');
+        
+        procurementRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 5) {
+                procurementData.push([
+                    cells[0].textContent.trim(),
+                    cells[1].textContent.trim(),
+                    cells[2].textContent.trim(),
+                    cells[3].textContent.trim(),
+                    cells[4].textContent.trim()
+                ]);
+            }
+        });
+
+        // Get total procurement cost
+        procurementData.push([
+            'TOTAL PROCUREMENT COST',
+            '',
+            '',
+            '',
+            formatCurrencyForPDF(projectData.totals.totalMaterialCost)
+        ]);
+
+        // Column widths
+        const procurementColumnStyles = {
+            0: { cellWidth: availableWidth * 0.25 },
+            1: { cellWidth: availableWidth * 0.12, halign: 'right' },
+            2: { cellWidth: availableWidth * 0.18 },
+            3: { cellWidth: availableWidth * 0.15, halign: 'right' },
+            4: { cellWidth: availableWidth * 0.30, halign: 'right' }
+        };
+
+        doc.autoTable({
+            ...TABLE_OPTS,
+            startY: startY,
+            head: [['Item', 'Qty Needed', 'Packaging', 'Units to Order', 'Cost']],
+            body: procurementData,
+            columnStyles: procurementColumnStyles,
+            didParseCell: function(data) {
+                if (data.section === 'body') {
+                    // Style the total row
+                    if (data.row.index === procurementData.length - 1) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [240, 240, 240];
+                        data.cell.styles.textColor = [BRAND.r, BRAND.g, BRAND.b];
+                    }
+                    // Right align numeric columns
+                    if (data.column.index === 1 || data.column.index === 3 || data.column.index === 4) {
+                        data.cell.styles.halign = 'right';
+                    }
+                }
+            }
+        });
+
+        const fileName = (projectData.projectName || 'estimate').replace(/[^a-z0-9]/gi, '-') + '_multi_wire_electrical_estimate.pdf';
+        doc.save(fileName);
+
+    } catch (e) {
+        console.error('PDF Generation Error:', e);
+        alert('Error generating PDF: ' + e.message);
+    }
 }
 
 function exportToExcel() {
-    // Your existing Excel export function
-    console.log('Excel export would run here');
-    alert('Excel export would run (check original code for full implementation)');
+    const projectData = AppState.get('projectData');
+    if (!projectData.totals) {
+        alert('No results to export. Please calculate an estimate first.');
+        return;
+    }
+    
+    // Create a new workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Prepare data for the Bill of Quantities sheet
+    const boqData = [
+        ['Item', 'Description', 'Qty', 'Unit', 'Unit Cost', 'Material Cost', 'Labor Cost', 'Total']
+    ];
+    
+    // Get data from the table
+    const boqTable = document.getElementById('billOfQuantity');
+    const rows = boqTable.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 1) {
+            const rowData = [];
+            cells.forEach(cell => {
+                rowData.push(cell.textContent);
+            });
+            boqData.push(rowData);
+        }
+    });
+    
+    // Add total row
+    boqData.push([
+        'TOTAL DIRECT COST',
+        '',
+        '',
+        '',
+        '',
+        formatCurrencyForPDF(projectData.totals.totalMaterialCost),
+        formatCurrencyForPDF(projectData.totals.totalLaborCost),
+        formatCurrencyForPDF(projectData.totals.directCost)
+    ]);
+    
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet(boqData);
+    
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Bill of Quantities');
+    
+    // Create Circuit Summary sheet
+    const circuitData = [
+        ['Multi-Wire Circuit Summary'],
+        ['Circuit Type', 'Wire Size', 'Percentage', 'Boxes', 'NEC Status', 'Required Volume', 'Minimum Box']
+    ];
+    
+    projectData.circuits.forEach(circuit => {
+        const nec = circuit.necResult;
+        circuitData.push([
+            circuit.description,
+            circuit.wireSize + ' AWG',
+            (circuit.percentage * 100).toFixed(0) + '%',
+            circuit.circuitBoxes,
+            nec.isCompliant ? 'COMPLIANT' : 'NON-COMPLIANT',
+            formatNumberForPDF(nec.volumeWithSafety, 2) + ' cu. in.',
+            nec.smallestSuitableBox || 'Custom box required'
+        ]);
+    });
+    
+    // Add totals
+    circuitData.push([
+        'TOTAL',
+        'Multi-Wire',
+        '100%',
+        Math.round(projectData.quantities.totalOutlets),
+        'OPTIMIZED',
+        '',
+        ''
+    ]);
+    
+    const circuitWs = XLSX.utils.aoa_to_sheet(circuitData);
+    XLSX.utils.book_append_sheet(wb, circuitWs, 'Circuit Summary');
+    
+    // Save the workbook
+    XLSX.writeFile(wb, 'Multi_Wire_Electrical_Estimate_' + (projectData.projectName || 'project').replace(/\s+/g, '_') + '.xlsx');
 }
 
 // Make functions globally available
